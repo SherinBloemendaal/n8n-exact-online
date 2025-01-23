@@ -70,17 +70,14 @@ export async function exactOnlineApiRequest(
 		};
 
 		let response;
-		let retry = true;
-		while (retry) {
-			try {
+		try {
+			response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
+		} catch (error) {
+			if (error.response && error.response.statusCode === 429) {
+				await new Promise((resolve) => setTimeout(resolve, 60000)); // Wait for 60 seconds before retrying
 				response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
-				retry = false;
-			} catch (error) {
-				if (error.response && error.response.statusCode === 429) {
-					await new Promise((resolve) => setTimeout(resolve, 60000)); // Wait for 60 seconds before retrying
-				} else {
-					throw error;
-				}
+			} else {
+				throw error;
 			}
 		}
 		return response;
