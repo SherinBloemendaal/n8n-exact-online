@@ -152,6 +152,20 @@ export class ExactOnline implements INodeType {
 				},
 			},
 			{
+				displayName: 'Disable waiting for minutely rate limit',
+				name: 'ignoreRateLimit',
+				type: 'boolean',
+				default: false,
+				description: 'When set to true, the node will not wait for the minutely rate limit to reset which will result in 429 errors when exceeding the rate-limit.',
+				displayOptions:{
+					show:	{
+						operation: [
+							'getAll',
+						],
+					},
+				},
+			},
+			{
 				displayName: 'Fields to Get',
 				name: 'selectedFields',
 				type: 'multiOptions',
@@ -462,6 +476,8 @@ export class ExactOnline implements INodeType {
 					const limit = this.getNodeParameter('limit', itemIndex, 0) as number;
 					const conjunction = this.getNodeParameter('conjunction', itemIndex, 'and') as string;
 					const filter = this.getNodeParameter('filter.filter', itemIndex, 0) as IDataObject[];
+					const ignoreRateLimit = this.getNodeParameter('ignoreRateLimit', 0, false) as boolean;
+
 					if(excludeSelection){
 						qs['$select'] = onlyNotSelectedFields.join(',');
 					}
@@ -476,7 +492,7 @@ export class ExactOnline implements INodeType {
 							const fieldValue =filter[filterIndex].value as string;
 							switch(fieldType){
 								case 'string':
-									filters.push(`${fieldName} ${filter[filterIndex].operator} '${filter[filterIndex].value}'`);
+									filters.push(`${fieldName} ${filter[filterIndex].operator} ${filter[filterIndex].value}`);
 									break;
 								case 'boolean':
 									filters.push(`${fieldName} ${filter[filterIndex].operator} ${fieldValue.toLowerCase() === 'true'}`);
@@ -491,7 +507,7 @@ export class ExactOnline implements INodeType {
 					}
 					qs['$filter'] = filters.join(` ${conjunction} `);
 
-					responseData = await getAllData.call(this, uri,limit,{},qs);
+					responseData = await getAllData.call(this, uri,limit,{},qs,{},ignoreRateLimit);
 					returnData = returnData.concat(responseData);
 				}
 

@@ -107,6 +107,7 @@ export async function getAllData(this: IExecuteFunctions | IExecuteSingleFunctio
 	body: IDataObject = {},
 	qs: IDataObject = {},
 	option: IDataObject = {},
+ 	ignoreRateLimit = false,
 	): Promise<IDataObject[]> {
 		let returnData:IDataObject[] = [];
 		let responseData;
@@ -127,9 +128,11 @@ export async function getAllData(this: IExecuteFunctions | IExecuteSingleFunctio
 			}
 			nextPageUrl = responseData.body.d.__next;
 
-			if(responseData.headers['x-ratelimit-minutely-remaining'] === "0"){
+			if (!ignoreRateLimit && responseData.headers['x-ratelimit-minutely-remaining'] === "0") {
 				const waitTime = (+responseData.headers['x-ratelimit-minutely-reset']) - Date.now();
-				setTimeout(() => {  },  Math.max(0,Math.min(waitTime,60000)));
+				if (waitTime >= 0) {
+					await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 60000)));
+				}
 			}
 
 		} while ((limit === 0 || returnData.length < limit) && responseData.body.d.__next);
