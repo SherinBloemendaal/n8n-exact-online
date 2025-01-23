@@ -69,10 +69,20 @@ export async function exactOnlineApiRequest(
 			includeCredentialsOnRefreshOnBody: true,
 		};
 
-		//@ts-ignore
-		//const response = await this.helpers.requestOAuth2.call(this, 'exactOnlineApiOAuth2Api', options, oAuth2Options);
-		const response =await this.helpers.requestWithAuthentication.call(this, credentialType, options);
-		//@ts-ignore
+		let response;
+		let retry = true;
+		while (retry) {
+			try {
+				response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
+				retry = false;
+			} catch (error) {
+				if (error.response && error.response.statusCode === 429) {
+					await new Promise((resolve) => setTimeout(resolve, 60000)); // Wait for 60 seconds before retrying
+				} else {
+					throw error;
+				}
+			}
+		}
 		return response;
 	} catch (error) {
 		throw new NodeApiError(this.getNode(), error);
