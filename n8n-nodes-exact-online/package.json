@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-exact-online-v1",
-  "version": "0.2.9",
+  "version": "0.2.11",
   "private": false,
   "description": "Exact Online Community node for n8n",
   "keywords": [

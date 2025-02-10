@@ -8,7 +8,7 @@ import {
 	ILoadOptionsFunctions,
 } from 'n8n-core';
 
-import { IDataObject, IOAuth2Options, NodeApiError } from 'n8n-workflow';
+import { IDataObject, IOAuth2Options, NodeApiError, NodeOperationError } from 'n8n-workflow';
 import { endpointConfiguration, endpointFieldConfiguration, LoadedDivision, LoadedFields, LoadedOptions } from './types';
 
 
@@ -72,9 +72,11 @@ export async function exactOnlineApiRequest(
 		let response;
 		try {
 			response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
-		} catch (error) {
-			if (error.response && error.response.statusCode === 429) {
-				await new Promise((resolve) => setTimeout(resolve, 6000)); // Wait for 60 seconds before retrying
+		} catch (error: unknown) {
+			if (error instanceof NodeApiError && error.httpCode === '429') {
+				console.warn('[ExactNode] Detected 429: waiting 60 seconds.')
+				await new Promise((resolve) => setTimeout(resolve, 61000)); // Wait for 60 seconds before retrying
+				console.warn('[ExactNode] Waiting done.');
 				response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
 			} else {
 				throw error;
