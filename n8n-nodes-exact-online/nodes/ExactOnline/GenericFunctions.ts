@@ -74,7 +74,7 @@ export async function exactOnlineApiRequest(
 			response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
 		} catch (error: unknown) {
 			if (error instanceof NodeApiError && error.httpCode === '429') {
-				console.warn('[ExactNode] Detected 429: waiting 60 seconds.')
+				console.warn('[ExactNode] Detected 429: waiting 60 seconds.');
 				await new Promise((resolve) => setTimeout(resolve, 61000)); // Wait for 60 seconds before retrying
 				console.warn('[ExactNode] Waiting done.');
 				response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
