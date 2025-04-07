@@ -504,8 +504,10 @@ export class ExactOnline implements INodeType {
 									break;
 							}
 						}
+						if(filters.length > 0) {
+							qs['$filter'] = filters.join(` ${conjunction} `);
+						}
 					}
-					qs['$filter'] = filters.join(` ${conjunction} `);
 
 					responseData = await getAllData.call(this, uri,limit,{},qs,{},ignoreRateLimit);
 					returnData = returnData.concat(responseData);
