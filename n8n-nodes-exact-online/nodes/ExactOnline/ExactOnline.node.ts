@@ -8,7 +8,7 @@ import {
 	INodeTypeDescription,
 	NodeOperationError,
 } from 'n8n-workflow';
-import { exactOnlineApiRequest, exactOnlineXmlRequest, createReconciliationXml, getAllData, getCurrentDivision, getData, getEndpointConfig, getEndpointFieldConfig, getFields, getFieldType, getMandatoryFields, getResourceOptions, getServiceOptions, toDivisionOptions, toFieldFilterOptions, toFieldSelectOptions, toOptions, toOptionsFromStringArray } from './GenericFunctions';
+import { createReconciliationXml, exactOnlineApiRequest, exactOnlineXmlRequest, getAllData, getCurrentDivision, getData, getEndpointConfig, getEndpointFieldConfig, getFields, getFieldType, getMandatoryFields, getResourceOptions, getServiceOptions, toDivisionOptions, toFieldFilterOptions, toFieldSelectOptions, toOptions, toOptionsFromStringArray } from './GenericFunctions';
 import { endpointConfiguration, endpointFieldConfiguration, LoadedDivision, LoadedFields, LoadedOptions, MatchSet, ReconciledTransaction, WriteOff } from './types';
 
 export class ExactOnline implements INodeType {
@@ -884,7 +884,7 @@ export class ExactOnline implements INodeType {
 						throw new NodeOperationError(
 							this.getNode(),
 							'Please provide GL Account Code for reconciliation',
-							{ itemIndex }
+							{ itemIndex },
 						);
 					}
 
@@ -892,7 +892,7 @@ export class ExactOnline implements INodeType {
 						throw new NodeOperationError(
 							this.getNode(),
 							'At least two transactions are required for reconciliation',
-							{ itemIndex }
+							{ itemIndex },
 						);
 					}
 
@@ -955,7 +955,7 @@ export class ExactOnline implements INodeType {
 							this,
 							division,
 							'FFMatch',
-							xmlBody
+							xmlBody,
 						);
 
 						if (response.statusCode === 200) {
@@ -968,14 +968,14 @@ export class ExactOnline implements INodeType {
 							throw new NodeOperationError(
 								this.getNode(),
 								`Failed to reconcile: ${response.statusCode} ${response.body}`,
-								{ itemIndex }
+								{ itemIndex },
 							);
 						}
 					} catch (error) {
 						throw new NodeOperationError(
 							this.getNode(),
 							`Failed to reconcile: ${error.message}`,
-							{ itemIndex }
+							{ itemIndex },
 						);
 					}
 				}
