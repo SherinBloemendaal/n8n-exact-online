@@ -403,6 +403,12 @@ export class ExactOnline implements INodeType {
 						operation: [
 							'postXml',
 						],
+						service: [
+							'financial',
+						],
+						resource: [
+							'MatchSets',
+						],
 					},
 				},
 				description: 'Configure automatic reconciliation between transactions in Exact Online. This uses the XML API since the REST API does not support automatic reconciliation. Specify the GL account and customer account to match, and optionally configure write-off parameters.',
@@ -537,6 +543,12 @@ export class ExactOnline implements INodeType {
 						operation: [
 							'postXml',
 						],
+						service: [
+							'financial',
+						],
+						resource: [
+							'MatchSets',
+						],
 					},
 				},
 				options: [
@@ -617,13 +629,23 @@ export class ExactOnline implements INodeType {
 			async getOperations(this: ILoadOptionsFunctions) {
 				const service = this.getNodeParameter('service', 0) as string;
 				const resource = this.getNodeParameter('resource', 0) as string;
+
+				// Special case for MatchSets - only offer postXml operation
+				if (service.toLowerCase() === 'financial' && resource === 'MatchSets') {
+					return [
+						{
+							name: 'POST (XML)',
+							value: 'postXml',
+						},
+					];
+				}
+
+				// Normal handling for all other resources
 				const endpointConfig = await getEndpointConfig.call(this,service,resource) as endpointConfiguration;
 				const methods = endpointConfig.methods.map(x=>x.toLowerCase());
 				if(methods.includes('get')){
 					methods.push('getAll');
 				}
-				// Add XML operation for all resources
-				methods.push('postXml');
 				return toOptionsFromStringArray(methods);
 			},
 

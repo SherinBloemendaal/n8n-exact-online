@@ -65119,5 +65119,19 @@
 		"methods": ["GET"],
 		"service": "Workflow",
 		"endpoint": "RequestAttachments"
+	},
+	{
+			"doc": "https://start.exactonline.nl/docs/HlpRestAPIResourcesDetails.aspx?name=FinancialMatchSets",
+			"uri": "/api/v1/{division}/financial/MatchSets",
+			"service": "Financial",
+			"endpoint": "MatchSets",
+			"webhook": false,
+			"methods": ["POST"],
+			"fields": [
+				{ "webhook": false, "filter": false, "name": "GLAccount", "type": "string", "mandatory": true },
+				{ "webhook": false, "filter": false, "name": "Account", "type": "string", "mandatory": false },
+				{ "webhook": false, "filter": false, "name": "MatchLines", "type": "array", "mandatory": true },
+				{ "webhook": false, "filter": false, "name": "WriteOff", "type": "object", "mandatory": false }
+			]
 	}
 ]
