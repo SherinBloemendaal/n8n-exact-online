@@ -9,7 +9,7 @@ import {
 } from 'n8n-core';
 
 import { IDataObject, IOAuth2Options, NodeApiError, NodeOperationError } from 'n8n-workflow';
-import { endpointConfiguration, endpointFieldConfiguration, LoadedDivision, LoadedFields, LoadedOptions } from './types';
+import { endpointConfiguration, endpointFieldConfiguration, LoadedDivision, LoadedFields, LoadedOptions, MatchSet } from './types';
 
 
 export async function exactOnlineApiRequest(
@@ -218,3 +218,138 @@ items.map(({ name }) => ({ name, value: name }));
 
 export const toOptionsFromStringArray = (items:string[]) =>
 	items.map((x) => ({name:x.charAt(0).toUpperCase() + x.slice(1), value:x}));
+
+/**
+ * Makes an XML request to the Exact Online XML API
+ */
+export async function exactOnlineXmlRequest(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+	division: string,
+	topic: string,
+	xmlBody: string,
+	// tslint:disable-next-line:no-any
+): Promise<any> {
+	const options: OptionsWithUri = {
+		headers: {
+			'Content-Type': 'application/xml',
+		},
+		method: 'POST',
+		body: xmlBody,
+		uri: '',
+	};
+	// @ts-ignore
+	options.resolveWithFullResponse = true;
+
+	const authenticationMethod = this.getNodeParameter(
+		'authentication',
+		0,
+		'accessToken',
+	) as string;
+	let credentialType = '';
+	if (authenticationMethod === 'accessToken') {
+		const credentials = await this.getCredentials('exactOnlineApi');
+		credentialType = 'exactOnlineApi';
+
+		const baseUrl = credentials.url || 'https://start.exactonline.nl';
+		options.uri = `${baseUrl}/docs/XMLUpload.aspx?Topic=${topic}&_Division_=${division}`;
+	} else {
+		const credentials = await this.getCredentials('exactOnlineApiOAuth2Api');
+		credentialType = 'exactOnlineApiOAuth2Api';
+
+		const baseUrl = credentials.url || 'https://start.exactonline.nl';
+		options.uri = `${baseUrl}/docs/XMLUpload.aspx?Topic=${topic}&_Division_=${division}`;
+	}
+
+	try {
+		const oAuth2Options: IOAuth2Options = {
+			includeCredentialsOnRefreshOnBody: true,
+		};
+
+		let response;
+		try {
+			response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
+		} catch (error) {
+			console.warn('[ExactNode] Error: ' + error.httpCode + ' | ' + error?.response?.status);
+			if (error.httpCode && parseInt(error.httpCode, 10) === 429) {
+				console.warn('[ExactNode] Detected 429: waiting 60 seconds.');
+				await new Promise((resolve) => setTimeout(resolve, 61000)); // Wait for 60 seconds before retrying
+				console.warn('[ExactNode] Waiting done.');
+				response = await this.helpers.requestWithAuthentication.call(this, credentialType, options);
+			} else {
+				console.warn('[ExactNode] Unknown error', error);
+				throw error;
+			}
+		}
+		return response;
+	} catch (error) {
+		throw new NodeApiError(this.getNode(), error);
+	}
+}
+
+/**
+ * Creates XML for reconciliation
+ */
+export function createReconciliationXml(matchSets: MatchSet[]): string {
+	let xml = '<?xml version="1.0" encoding="utf-8"?>\n';
+	xml += '<MatchSets xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n';
+
+	// Add match sets
+	for (const matchSet of matchSets) {
+		xml += '  <MatchSet>\n';
+
+		// GLAccount - using code attribute as per example
+		xml += `    <GLAccount code="${matchSet.GLAccount}"/>\n`;
+
+		// Account (optional) - using code attribute as per example
+		if (matchSet.Account) {
+			xml += `    <Account code="${matchSet.Account}"/>\n`;
+		}
+
+		// Match Lines
+		xml += '    <MatchLines>\n';
+		for (const matchLine of matchSet.MatchLines) {
+			xml += '      <MatchLine ';
+			xml += `finyear="${parseInt(matchLine.finYear as string, 10)}" `;
+			xml += `finperiod="${parseInt(matchLine.finPeriod as string, 10)}" `;
+			xml += `journal="${matchLine.journal}" `;
+			xml += `entry="${parseInt(matchLine.entry as string, 10)}" `;
+			xml += `amountdc="${parseFloat(matchLine.amountDC as string)}" `;
+			xml += '/>\n';
+		}
+		xml += '    </MatchLines>\n';
+
+		// WriteOff (optional) - now after MatchLines as per schema
+		if (matchSet.WriteOff) {
+			xml += `    <WriteOff type="${matchSet.WriteOff.type}">\n`;
+
+			// Only include GLAccount if provided
+			if (matchSet.WriteOff.GLAccount) {
+				xml += `      <GLAccount code="${matchSet.WriteOff.GLAccount}"/>\n`;
+			}
+
+			// Only include fields if they're provided
+			if (matchSet.WriteOff.Description) {
+				xml += `      <Description>${matchSet.WriteOff.Description}</Description>\n`;
+			}
+
+			if (matchSet.WriteOff.FinYear) {
+				xml += `      <FinYear>${parseInt(matchSet.WriteOff.FinYear as string, 10)}</FinYear>\n`;
+			}
+
+			if (matchSet.WriteOff.FinPeriod) {
+				xml += `      <FinPeriod>${parseInt(matchSet.WriteOff.FinPeriod as string, 10)}</FinPeriod>\n`;
+			}
+
+			if (matchSet.WriteOff.Date) {
+				xml += `      <Date>${matchSet.WriteOff.Date}</Date>\n`;
+			}
+
+			xml += '    </WriteOff>\n';
+		}
+
+		xml += '  </MatchSet>\n';
+	}
+
+	xml += '</MatchSets>';
+	return xml;
+}

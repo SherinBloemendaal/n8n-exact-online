@@ -8,8 +8,8 @@ import {
 	INodeTypeDescription,
 	NodeOperationError,
 } from 'n8n-workflow';
-import { exactOnlineApiRequest, getAllData, getCurrentDivision, getData, getEndpointConfig, getEndpointFieldConfig, getFields, getFieldType, getMandatoryFields, getResourceOptions, getServiceOptions, toDivisionOptions, toFieldFilterOptions, toFieldSelectOptions, toOptions, toOptionsFromStringArray } from './GenericFunctions';
-import { endpointConfiguration, endpointFieldConfiguration, LoadedDivision, LoadedFields, LoadedOptions } from './types';
+import { exactOnlineApiRequest, exactOnlineXmlRequest, createReconciliationXml, getAllData, getCurrentDivision, getData, getEndpointConfig, getEndpointFieldConfig, getFields, getFieldType, getMandatoryFields, getResourceOptions, getServiceOptions, toDivisionOptions, toFieldFilterOptions, toFieldSelectOptions, toOptions, toOptionsFromStringArray } from './GenericFunctions';
+import { endpointConfiguration, endpointFieldConfiguration, LoadedDivision, LoadedFields, LoadedOptions, MatchSet, ReconciledTransaction, WriteOff } from './types';
 
 export class ExactOnline implements INodeType {
 	description: INodeTypeDescription = {
@@ -103,6 +103,32 @@ export class ExactOnline implements INodeType {
 				},
 				default: '',
 				description: 'Operation to use. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>.',
+				options: [
+					{
+						name: 'Delete',
+						value: 'delete',
+					},
+					{
+						name: 'Get',
+						value: 'get',
+					},
+					{
+						name: 'Get All',
+						value: 'getAll',
+					},
+					{
+						name: 'Post',
+						value: 'post',
+					},
+					{
+						name: 'POST (XML)',
+						value: 'postXml',
+					},
+					{
+						name: 'Put',
+						value: 'put',
+					},
+				],
 			},
 			{
 				displayName: 'ID',
@@ -293,6 +319,7 @@ export class ExactOnline implements INodeType {
 					show: {
 						operation:[
 							'post',
+							'postXml',
 							'put',
 						],
 					},
@@ -307,6 +334,7 @@ export class ExactOnline implements INodeType {
 					show: {
 						operation:[
 							'post',
+							'postXml',
 							'put',
 						],
 						useManualBody:[
@@ -330,6 +358,7 @@ export class ExactOnline implements INodeType {
 					show: {
 						operation:[
 							'post',
+							'postXml',
 							'put',
 						],
 						useManualBody:[
@@ -358,6 +387,202 @@ export class ExactOnline implements INodeType {
 								type: 'string',
 								default: '',
 								description: 'Value for the field to add/edit',
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Reconciliation',
+				name: 'reconciliation',
+				placeholder: 'Setup reconciliation',
+				type: 'fixedCollection',
+				default: {},
+				displayOptions: {
+					show: {
+						operation: [
+							'postXml',
+						],
+					},
+				},
+				description: 'Configure automatic reconciliation between transactions in Exact Online. This uses the XML API since the REST API does not support automatic reconciliation. Specify the GL account and customer account to match, and optionally configure write-off parameters.',
+				options: [
+					{
+						name: 'matchSet',
+						displayName: 'Match Set',
+						values: [
+							{
+								displayName: 'GL Account Code',
+								name: 'glAccountCode',
+								type: 'string',
+								default: '',
+								required: true,
+								description: 'GL Account code for reconciliation',
+							},
+							{
+								displayName: 'Account Code',
+								name: 'accountCode',
+								type: 'string',
+								default: '',
+								required: false,
+								description: 'Account code for reconciliation. Required if GL Account is of type Accounts receivable or Accounts payable.',
+							},
+							{
+								displayName: 'Include Write-Off',
+								name: 'includeWriteOff',
+								type: 'boolean',
+								default: false,
+								description: 'Whether to include write-off information',
+							},
+							{
+								displayName: 'Write-Off Type',
+								name: 'writeOffType',
+								type: 'string',
+								default: '4',
+								description: 'Type of write-off',
+								displayOptions: {
+									show: {
+										includeWriteOff: [
+											true,
+										],
+									},
+								},
+							},
+							{
+								displayName: 'Write-Off GL Account',
+								name: 'writeOffGLAccount',
+								type: 'string',
+								default: '',
+								description: 'GL Account for write-off',
+								displayOptions: {
+									show: {
+										includeWriteOff: [
+											true,
+										],
+									},
+								},
+							},
+							{
+								displayName: 'Write-Off Description',
+								name: 'writeOffDescription',
+								type: 'string',
+								default: '',
+								description: 'Description for write-off',
+								displayOptions: {
+									show: {
+										includeWriteOff: [
+											true,
+										],
+									},
+								},
+							},
+							{
+								displayName: 'Write-Off Financial Year',
+								name: 'writeOffFinYear',
+								type: 'string',
+								default: '',
+								description: 'Financial year for write-off',
+								displayOptions: {
+									show: {
+										includeWriteOff: [
+											true,
+										],
+									},
+								},
+							},
+							{
+								displayName: 'Write-Off Financial Period',
+								name: 'writeOffFinPeriod',
+								type: 'string',
+								default: '',
+								description: 'Financial period for write-off',
+								displayOptions: {
+									show: {
+										includeWriteOff: [
+											true,
+										],
+									},
+								},
+							},
+							{
+								displayName: 'Write-Off Date',
+								name: 'writeOffDate',
+								type: 'string',
+								default: '',
+								description: 'Date for write-off in format YYYY-MM-DD',
+								displayOptions: {
+									show: {
+										includeWriteOff: [
+											true,
+										],
+									},
+								},
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Transactions',
+				name: 'transactions',
+				placeholder: 'Add transactions to reconcile',
+				type: 'fixedCollection',
+				typeOptions: {
+					multipleValues: true,
+				},
+				default: {},
+				description: 'Transactions to reconcile against each other. Add at least two transactions (e.g., an invoice and a payment) to be matched in Exact Online. You need the financial year, period, journal code, entry number, and amount for each transaction. These can be obtained from the transaction entries in Exact Online.',
+				displayOptions: {
+					show: {
+						operation: [
+							'postXml',
+						],
+					},
+				},
+				options: [
+					{
+						name: 'transaction',
+						displayName: 'Transaction',
+						values: [
+							{
+								displayName: 'Financial Year',
+								name: 'finYear',
+								type: 'string',
+								default: '',
+								required: true,
+								description: 'Financial year of the transaction',
+							},
+							{
+								displayName: 'Financial Period',
+								name: 'finPeriod',
+								type: 'string',
+								default: '',
+								required: true,
+								description: 'Financial period of the transaction',
+							},
+							{
+								displayName: 'Journal',
+								name: 'journal',
+								type: 'string',
+								default: '',
+								required: true,
+								description: 'Journal code of the transaction',
+							},
+							{
+								displayName: 'Entry',
+								name: 'entry',
+								type: 'string',
+								default: '',
+								required: true,
+								description: 'Entry number of the transaction',
+							},
+							{
+								displayName: 'Amount (DC)',
+								name: 'amountDC',
+								type: 'string',
+								default: '',
+								required: true,
+								description: 'Amount (Debit/Credit) of the transaction',
 							},
 						],
 					},
@@ -397,6 +622,8 @@ export class ExactOnline implements INodeType {
 				if(methods.includes('get')){
 					methods.push('getAll');
 				}
+				// Add XML operation for all resources
+				methods.push('postXml');
 				return toOptionsFromStringArray(methods);
 			},
 
@@ -563,7 +790,7 @@ export class ExactOnline implements INodeType {
 						}
 					}
 
-					responseData = await exactOnlineApiRequest.call(this,'Post', uri,body,{},{headers: {Prefer:'return=representation'}});
+					responseData = await exactOnlineApiRequest.call(this,'Post',uri,body,{},{headers: {Prefer:'return=representation'}});
 					returnData = returnData.concat(responseData.body.d);
 				}
 
@@ -646,8 +873,111 @@ export class ExactOnline implements INodeType {
 							itemIndex,
 						});
 					}
+				}
 
+				if(operation === 'postXml'){
+					// Get the reconciliation parameters
+					const matchSetData = this.getNodeParameter('reconciliation.matchSet', itemIndex, {}) as IDataObject;
+					const transactionsData = this.getNodeParameter('transactions.transaction', itemIndex, []) as IDataObject[];
 
+					if (!matchSetData.glAccountCode) {
+						throw new NodeOperationError(
+							this.getNode(),
+							'Please provide GL Account Code for reconciliation',
+							{ itemIndex }
+						);
+					}
+
+					if (transactionsData.length < 2) {
+						throw new NodeOperationError(
+							this.getNode(),
+							'At least two transactions are required for reconciliation',
+							{ itemIndex }
+						);
+					}
+
+					// Prepare match lines
+					const matchLines: ReconciledTransaction[] = transactionsData.map(transaction => ({
+						finYear: transaction.finYear as string,
+						finPeriod: transaction.finPeriod as string,
+						journal: transaction.journal as string,
+						entry: transaction.entry as string,
+						amountDC: transaction.amountDC as string,
+					}));
+
+					// Prepare match set
+					const matchSet: MatchSet = {
+						GLAccount: matchSetData.glAccountCode as string,
+						MatchLines: matchLines,
+					};
+
+					// Add Account if provided (required for receivable/payable GL accounts)
+					if (matchSetData.accountCode) {
+						matchSet.Account = matchSetData.accountCode as string;
+					}
+
+					// Add write-off information if needed
+					if (matchSetData.includeWriteOff === true) {
+						const writeOff: WriteOff = {
+							type: matchSetData.writeOffType as string || '4',
+						};
+
+						// Only add fields if they are provided
+						if (matchSetData.writeOffGLAccount) {
+							writeOff.GLAccount = matchSetData.writeOffGLAccount as string;
+						}
+
+						if (matchSetData.writeOffDescription) {
+							writeOff.Description = matchSetData.writeOffDescription as string;
+						}
+
+						if (matchSetData.writeOffFinYear) {
+							writeOff.FinYear = matchSetData.writeOffFinYear as string;
+						}
+
+						if (matchSetData.writeOffFinPeriod) {
+							writeOff.FinPeriod = matchSetData.writeOffFinPeriod as string;
+						}
+
+						if (matchSetData.writeOffDate) {
+							writeOff.Date = matchSetData.writeOffDate as string;
+						}
+
+						matchSet.WriteOff = writeOff;
+					}
+
+					// Create XML for the reconciliation
+					const xmlBody = createReconciliationXml([matchSet]);
+
+					// Send XML request
+					try {
+						const response = await exactOnlineXmlRequest.call(
+							this,
+							division,
+							'FFMatch',
+							xmlBody
+						);
+
+						if (response.statusCode === 200) {
+							returnData.push({
+								success: true,
+								message: 'Reconciliation completed successfully',
+								response: response.body,
+							});
+						} else {
+							throw new NodeOperationError(
+								this.getNode(),
+								`Failed to reconcile: ${response.statusCode} ${response.body}`,
+								{ itemIndex }
+							);
+						}
+					} catch (error) {
+						throw new NodeOperationError(
+							this.getNode(),
+							`Failed to reconcile: ${error.message}`,
+							{ itemIndex }
+						);
+					}
 				}
 
 
