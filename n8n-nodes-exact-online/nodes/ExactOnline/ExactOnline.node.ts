@@ -128,6 +128,10 @@ export class ExactOnline implements INodeType {
 						name: 'Put',
 						value: 'put',
 					},
+					{
+						name: 'Get All Via Parent ID',
+						value: 'getAllViaParentId',
+					},
 				],
 			},
 			{
@@ -147,6 +151,24 @@ export class ExactOnline implements INodeType {
 				},
 			},
 			{
+				displayName: 'Parent ID',
+				name: 'parentId',
+				type: 'string',
+				default: '',
+				required: true,
+				description: 'The GUID ID of the parent resource (e.g., BankEntry ID)',
+				displayOptions:{
+					show:	{
+						resource: [
+							'BankEntryLines',
+						],
+						operation: [
+							'getAllViaParentId',
+						],
+					},
+				},
+			},
+			{
 				displayName: 'Limit',
 				name: 'limit',
 				type: 'number',
@@ -159,6 +181,7 @@ export class ExactOnline implements INodeType {
 					show:	{
 						operation: [
 							'getAll',
+							'getAllViaParentId',
 						],
 					},
 				},
@@ -187,6 +210,7 @@ export class ExactOnline implements INodeType {
 					show:	{
 						operation: [
 							'getAll',
+							'getAllViaParentId',
 						],
 					},
 				},
@@ -646,6 +670,12 @@ export class ExactOnline implements INodeType {
 				if(methods.includes('get')){
 					methods.push('getAll');
 				}
+
+				// Conditionally add 'getAllViaParentId' for specific resources like BankEntryLines
+				if (service.toLowerCase() === 'financialtransaction' && resource === 'BankEntryLines') {
+					methods.push('getAllViaParentId');
+				}
+
 				return toOptionsFromStringArray(methods);
 			},
 
@@ -759,6 +789,22 @@ export class ExactOnline implements INodeType {
 					}
 
 					responseData = await getAllData.call(this, uri,limit,{},qs,{},ignoreRateLimit);
+					returnData = returnData.concat(responseData);
+				}
+
+				if(operation === 'getAllViaParentId') {
+					const parentId = this.getNodeParameter('parentId', itemIndex, '') as string;
+					const limit = this.getNodeParameter('limit', itemIndex, 60) as number;
+					const ignoreRateLimit = this.getNodeParameter('ignoreRateLimit', 0, false) as boolean;
+
+					if (parentId === '') {
+						throw new NodeOperationError(this.getNode(), 'Parent ID is required for the getAllViaParentId operation.', { itemIndex });
+					}
+
+					const parentResource = 'BankEntries';
+					const specificUri = `/api/v1/${division}/${service}/${parentResource}(guid'${parentId}')/${resource}`;
+
+					responseData = await getAllData.call(this, specificUri, limit, {}, {}, {}, ignoreRateLimit);
 					returnData = returnData.concat(responseData);
 				}
 
