@@ -319,6 +319,10 @@ export class ExactOnline implements INodeType {
 										name: 'Not Equal',
 										value: 'ne',
 									},
+									{
+										name: 'Contains',
+										value: 'contains',
+									},
 								],
 								default: 'eq',
 								description: 'Operator to use in filter',
@@ -771,7 +775,13 @@ export class ExactOnline implements INodeType {
 							const fieldValue =filter[filterIndex].value as string;
 							switch(fieldType){
 								case 'string':
-									filters.push(`${fieldName} ${filter[filterIndex].operator} ${filter[filterIndex].value}`);
+									// Handle 'contains' operator specifically for strings, using OData v3 substringof
+									if (filter[filterIndex].operator === 'contains') {
+										filters.push(`substringof('${fieldValue}', ${fieldName})`); // Correct OData v3 syntax
+									} else {
+										// Existing logic for other string operators (eq, ne, etc.) - needs quotes
+										filters.push(`${fieldName} ${filter[filterIndex].operator} '${fieldValue}'`);
+									}
 									break;
 								case 'boolean':
 									filters.push(`${fieldName} ${filter[filterIndex].operator} ${fieldValue.toLowerCase() === 'true'}`);
