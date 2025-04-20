@@ -1,5 +1,6 @@
 import { OptionsWithUri } from 'request';
-import config from './fieldConfigArray.json';
+import restApiConfig from './ExactOnlineRestApi.json';
+import xmlApiConfig from './ExactOnlineXmlApi.json';
 
 import {
 	IExecuteFunctions,
@@ -10,13 +11,44 @@ import {
 
 import { IDataObject, IOAuth2Options, NodeApiError, NodeOperationError } from 'n8n-workflow';
 import {
-	endpointConfiguration,
-	endpointFieldConfiguration,
+	EndpointConfiguration,
+	EndpointFieldConfiguration,
 	LoadedDivision,
 	LoadedFields,
 	LoadedOptions,
 	MatchSet,
 } from './types';
+
+// Cached merged configuration
+let mergedConfigs: EndpointConfiguration[] | null = null;
+
+/**
+ * Loads and merges configurations from both REST and XML JSON files.
+ */
+function getAllConfigs(): EndpointConfiguration[] {
+	if (mergedConfigs) {
+		return mergedConfigs;
+	}
+
+	// Ensure configs are treated as arrays of the correct type
+	const restEndpoints = restApiConfig as unknown as EndpointConfiguration[];
+	const xmlEndpoints = xmlApiConfig as unknown as EndpointConfiguration[];
+
+	// Add apiType to each source array
+	const typedRestEndpoints = restEndpoints.map(config => ({
+		...config,
+		apiType: 'rest' as 'rest', // Explicitly type as 'rest'
+	}));
+	const typedXmlEndpoints = xmlEndpoints.map(config => ({
+		...config,
+		apiType: 'xml' as 'xml', // Explicitly type as 'xml'
+	}));
+
+	// Concatenate the typed arrays
+	mergedConfigs = [...typedRestEndpoints, ...typedXmlEndpoints];
+
+	return mergedConfigs;
+}
 
 export async function exactOnlineApiRequest(
 	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
@@ -166,14 +198,14 @@ export async function getAllData(
 }
 export async function getFields(
 	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	endpointConfig: endpointConfiguration,
+	endpointConfig: EndpointConfiguration,
 ): Promise<string[]> {
 	return endpointConfig.fields.map((a) => a.name);
 }
 
 export async function getMandatoryFields(
 	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	endpointConfig: endpointConfiguration,
+	endpointConfig: EndpointConfiguration,
 ): Promise<string[]> {
 	return endpointConfig.fields.filter((x) => x.mandatory === true).map((a) => a.name);
 }
@@ -181,21 +213,25 @@ export async function getMandatoryFields(
 export async function getServiceOptions(
 	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
 ) {
-	return config.map((x) => x.service.toLocaleLowerCase());
+	// Use merged config
+	const allConfigs = getAllConfigs();
+	return allConfigs.map((x) => x.service.toLocaleLowerCase());
 }
 export async function getFieldType(
 	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	endpointConfig: endpointConfiguration,
+	endpointConfig: EndpointConfiguration,
 	fieldName: string,
 ): Promise<string> {
-	return endpointConfig.fields.filter((a) => a.name === fieldName)[0].type ?? 'string';
+	return endpointConfig.fields.filter((a) => a.name === fieldName)[0].type ?? 'Edm.String';
 }
 
 export async function getResourceOptions(
 	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
 	service: string,
 ) {
-	return config.filter((x) => x.service.toLocaleLowerCase() === service).map((x) => x.endpoint);
+	// Use merged config
+	const allConfigs = getAllConfigs();
+	return allConfigs.filter((x) => x.service.toLocaleLowerCase() === service).map((x) => x.endpoint);
 }
 
 export async function getEndpointFieldConfig(
@@ -203,19 +239,21 @@ export async function getEndpointFieldConfig(
 	service: string,
 	endpoint: string,
 ) {
-	return config.filter(
-		(x) => x.service.toLocaleLowerCase() === service && x.endpoint === endpoint,
-	)[0].fields;
+	// Use merged config, await the promise
+	const endpointConfig = await getEndpointConfig.call(this, service, endpoint);
+	return endpointConfig?.fields || []; // Return fields or empty array if not found
 }
 
 export async function getEndpointConfig(
 	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
 	service: string,
 	endpoint: string,
-) {
-	return config.filter(
-		(x) => x.service.toLocaleLowerCase() === service && x.endpoint === endpoint,
-	)[0];
+): Promise<EndpointConfiguration | undefined> { // Return type can be undefined
+	// Use merged config
+	const allConfigs = getAllConfigs();
+	return allConfigs.find(
+		(x) => x.service.toLocaleLowerCase() === service.toLocaleLowerCase() && x.endpoint === endpoint,
+	);
 }
 
 export const toDivisionOptions = (items: LoadedDivision[]) =>
@@ -230,7 +268,7 @@ export const toOptions = (items: LoadedOptions[]) =>
 export const toFieldSelectOptions = (items: LoadedFields[]) =>
 	items.map(({ name }) => ({ name, value: name }));
 
-export const toFieldFilterOptions = (items: endpointFieldConfiguration[]) =>
+export const toFieldFilterOptions = (items: EndpointFieldConfiguration[]) =>
 	items.map(({ name }) => ({ name, value: name }));
 
 export const toOptionsFromStringArray = (items: string[]) =>

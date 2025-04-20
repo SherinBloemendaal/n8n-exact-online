@@ -28660,7 +28660,8 @@
 		"uri": "/api/v1/{division}/financialtransaction/BankEntryLines",
 		"methods": ["GET", "POST"],
 		"service": "FinancialTransaction",
-		"endpoint": "BankEntryLines"
+		"endpoint": "BankEntryLines",
+		"parentResource": "BankEntries"
 	},
 	{
 		"fields": [
@@ -29183,7 +29184,8 @@
 		"uri": "/api/v1/{division}/financialtransaction/CashEntryLines",
 		"methods": ["GET", "POST"],
 		"service": "FinancialTransaction",
-		"endpoint": "CashEntryLines"
+		"endpoint": "CashEntryLines",
+		"parentResource": "CashEntries"
 	},
 	{
 		"fields": [
@@ -30528,7 +30530,8 @@
 		"uri": "/api/v1/{division}/generaljournalentry/GeneralJournalEntryLines",
 		"methods": ["GET", "POST"],
 		"service": "GeneralJournalEntry",
-		"endpoint": "GeneralJournalEntryLines"
+		"endpoint": "GeneralJournalEntryLines",
+		"parentResource": "GeneralJournalEntries"
 	},
 	{
 		"fields": [
@@ -61243,7 +61246,8 @@
 		"uri": "/api/v1/{division}/purchaseentry/PurchaseEntryLines",
 		"methods": ["GET", "POST", "PUT", "DELETE"],
 		"service": "PurchaseEntry",
-		"endpoint": "PurchaseEntryLines"
+		"endpoint": "PurchaseEntryLines",
+		"parentResource": "PurchaseEntries"
 	},
 	{
 		"fields": [
@@ -61515,7 +61519,8 @@
 		"uri": "/api/v1/{division}/purchaseorder/GoodsReceiptLines",
 		"methods": ["GET", "POST"],
 		"service": "PurchaseOrder",
-		"endpoint": "GoodsReceiptLines"
+		"endpoint": "GoodsReceiptLines",
+		"parentResource": "GoodsReceipts"
 	},
 	{
 		"fields": [
@@ -65079,7 +65084,8 @@
 		"uri": "/api/v1/{division}/salesentry/SalesEntryLines",
 		"methods": ["GET", "POST", "PUT", "DELETE"],
 		"service": "SalesEntry",
-		"endpoint": "SalesEntryLines"
+		"endpoint": "SalesEntryLines",
+		"parentResource": "SalesEntries"
 	},
 	{
 		"fields": [

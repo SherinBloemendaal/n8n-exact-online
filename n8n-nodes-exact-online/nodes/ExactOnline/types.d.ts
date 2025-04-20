@@ -12,7 +12,7 @@ export type LoadedFields = {
 	name: string;
 };
 
-export type endpointFieldConfiguration = {
+export type EndpointFieldConfiguration = {
 	name: string;
 	type: string;
 	webhook?: boolean;
@@ -20,14 +20,16 @@ export type endpointFieldConfiguration = {
 	mandatory: boolean;
 };
 
-export type endpointConfiguration = {
+export type EndpointConfiguration = {
 	service: string;
 	endpoint: string;
 	uri: string;
 	doc: string;
 	webhook: boolean;
 	methods: string[];
-	fields: endpointFieldConfiguration[];
+	fields: EndpointFieldConfiguration[];
+	parentResource?: string;
+	apiType?: 'rest' | 'xml';
 };
 
 export type ReconciledTransaction = {

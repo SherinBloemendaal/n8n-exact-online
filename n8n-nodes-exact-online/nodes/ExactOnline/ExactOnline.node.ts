@@ -4,6 +4,7 @@ import {
 	IDataObject,
 	ILoadOptionsFunctions,
 	INodeExecutionData,
+	INodeProperties,
 	INodeType,
 	INodeTypeDescription,
 	NodeOperationError,
@@ -29,8 +30,8 @@ import {
 	toOptionsFromStringArray,
 } from './GenericFunctions';
 import {
-	endpointConfiguration,
-	endpointFieldConfiguration,
+	EndpointConfiguration,
+	EndpointFieldConfiguration,
 	LoadedDivision,
 	LoadedFields,
 	LoadedOptions,
@@ -135,36 +136,6 @@ export class ExactOnline implements INodeType {
 				default: '',
 				description:
 					'Operation to use. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>.',
-				options: [
-					{
-						name: 'Delete',
-						value: 'delete',
-					},
-					{
-						name: 'Get',
-						value: 'get',
-					},
-					{
-						name: 'Get All',
-						value: 'getAll',
-					},
-					{
-						name: 'Post',
-						value: 'post',
-					},
-					{
-						name: 'POST (XML)',
-						value: 'postXml',
-					},
-					{
-						name: 'Put',
-						value: 'put',
-					},
-					{
-						name: 'Get All Via Parent ID',
-						value: 'getAllViaParentId',
-					},
-				],
 			},
 			{
 				displayName: 'ID',
@@ -184,10 +155,10 @@ export class ExactOnline implements INodeType {
 				type: 'string',
 				default: '',
 				required: true,
-				description: 'The GUID ID of the parent resource (e.g., BankEntry ID)',
+				description:
+					'The GUID ID of the parent resource (e.g., BankEntry ID when using BankEntryLines)',
 				displayOptions: {
 					show: {
-						resource: ['BankEntryLines'],
 						operation: ['getAllViaParentId'],
 					},
 				},
@@ -216,7 +187,7 @@ export class ExactOnline implements INodeType {
 					'Whether the selected fields are excluded instead of included. Select nothing to retrieve all fields.',
 				displayOptions: {
 					show: {
-						operation: ['getAll'],
+						operation: ['getAll', 'getAllViaParentId'],
 					},
 				},
 			},
@@ -246,7 +217,7 @@ export class ExactOnline implements INodeType {
 					'Fields to retrieve from Exact Online. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>.',
 				displayOptions: {
 					show: {
-						operation: ['getAll'],
+						operation: ['getAll', 'getAllViaParentId'],
 					},
 				},
 			},
@@ -285,7 +256,7 @@ export class ExactOnline implements INodeType {
 				default: {},
 				displayOptions: {
 					show: {
-						operation: ['getAll'],
+						operation: ['getAll', 'getAllViaParentId'],
 					},
 				},
 				options: [
@@ -359,7 +330,7 @@ export class ExactOnline implements INodeType {
 				default: false,
 				displayOptions: {
 					show: {
-						operation: ['post', 'postXml', 'put'],
+						operation: ['post', 'put'],
 					},
 				},
 			},
@@ -370,7 +341,7 @@ export class ExactOnline implements INodeType {
 				default: '',
 				displayOptions: {
 					show: {
-						operation: ['post', 'postXml', 'put'],
+						operation: ['post', 'put'],
 						useManualBody: [true],
 					},
 				},
@@ -388,7 +359,7 @@ export class ExactOnline implements INodeType {
 				default: {},
 				displayOptions: {
 					show: {
-						operation: ['post', 'postXml', 'put'],
+						operation: ['post', 'put'],
 						useManualBody: [false],
 					},
 				},
@@ -414,193 +385,6 @@ export class ExactOnline implements INodeType {
 								type: 'string',
 								default: '',
 								description: 'Value for the field to add/edit',
-							},
-						],
-					},
-				],
-			},
-			{
-				displayName: 'Reconciliation',
-				name: 'reconciliation',
-				placeholder: 'Setup reconciliation',
-				type: 'fixedCollection',
-				default: {},
-				displayOptions: {
-					show: {
-						operation: ['postXml'],
-						service: ['financial'],
-						resource: ['MatchSets'],
-					},
-				},
-				description:
-					'Configure automatic reconciliation between transactions in Exact Online. This uses the XML API since the REST API does not support automatic reconciliation. Specify the GL account and customer account to match, and optionally configure write-off parameters.',
-				options: [
-					{
-						name: 'matchSet',
-						displayName: 'Match Set',
-						values: [
-							{
-								displayName: 'GL Account Code',
-								name: 'glAccountCode',
-								type: 'string',
-								default: '',
-								required: true,
-								description: 'GL Account code for reconciliation',
-							},
-							{
-								displayName: 'Account Code',
-								name: 'accountCode',
-								type: 'string',
-								default: '',
-								required: false,
-								description:
-									'Account code for reconciliation. Required if GL Account is of type Accounts receivable or Accounts payable.',
-							},
-							{
-								displayName: 'Include Write-Off',
-								name: 'includeWriteOff',
-								type: 'boolean',
-								default: false,
-								description: 'Whether to include write-off information',
-							},
-							{
-								displayName: 'Write-Off Type',
-								name: 'writeOffType',
-								type: 'string',
-								default: '4',
-								description: 'Type of write-off',
-								displayOptions: {
-									show: {
-										includeWriteOff: [true],
-									},
-								},
-							},
-							{
-								displayName: 'Write-Off GL Account',
-								name: 'writeOffGLAccount',
-								type: 'string',
-								default: '',
-								description: 'GL Account for write-off',
-								displayOptions: {
-									show: {
-										includeWriteOff: [true],
-									},
-								},
-							},
-							{
-								displayName: 'Write-Off Description',
-								name: 'writeOffDescription',
-								type: 'string',
-								default: '',
-								description: 'Description for write-off',
-								displayOptions: {
-									show: {
-										includeWriteOff: [true],
-									},
-								},
-							},
-							{
-								displayName: 'Write-Off Financial Year',
-								name: 'writeOffFinYear',
-								type: 'string',
-								default: '',
-								description: 'Financial year for write-off',
-								displayOptions: {
-									show: {
-										includeWriteOff: [true],
-									},
-								},
-							},
-							{
-								displayName: 'Write-Off Financial Period',
-								name: 'writeOffFinPeriod',
-								type: 'string',
-								default: '',
-								description: 'Financial period for write-off',
-								displayOptions: {
-									show: {
-										includeWriteOff: [true],
-									},
-								},
-							},
-							{
-								displayName: 'Write-Off Date',
-								name: 'writeOffDate',
-								type: 'string',
-								default: '',
-								description: 'Date for write-off in format YYYY-MM-DD',
-								displayOptions: {
-									show: {
-										includeWriteOff: [true],
-									},
-								},
-							},
-						],
-					},
-				],
-			},
-			{
-				displayName: 'Transactions',
-				name: 'transactions',
-				placeholder: 'Add transactions to reconcile',
-				type: 'fixedCollection',
-				typeOptions: {
-					multipleValues: true,
-				},
-				default: {},
-				description:
-					'Transactions to reconcile against each other. Add at least two transactions (e.g., an invoice and a payment) to be matched in Exact Online. You need the financial year, period, journal code, entry number, and amount for each transaction. These can be obtained from the transaction entries in Exact Online.',
-				displayOptions: {
-					show: {
-						operation: ['postXml'],
-						service: ['financial'],
-						resource: ['MatchSets'],
-					},
-				},
-				options: [
-					{
-						name: 'transaction',
-						displayName: 'Transaction',
-						values: [
-							{
-								displayName: 'Financial Year',
-								name: 'finYear',
-								type: 'string',
-								default: '',
-								required: true,
-								description: 'Financial year of the transaction',
-							},
-							{
-								displayName: 'Financial Period',
-								name: 'finPeriod',
-								type: 'string',
-								default: '',
-								required: true,
-								description: 'Financial period of the transaction',
-							},
-							{
-								displayName: 'Journal',
-								name: 'journal',
-								type: 'string',
-								default: '',
-								required: true,
-								description: 'Journal code of the transaction',
-							},
-							{
-								displayName: 'Entry',
-								name: 'entry',
-								type: 'string',
-								default: '',
-								required: true,
-								description: 'Entry number of the transaction',
-							},
-							{
-								displayName: 'Amount (DC)',
-								name: 'amountDC',
-								type: 'string',
-								default: '',
-								required: true,
-								description: 'Amount (Debit/Credit) of the transaction',
 							},
 						],
 					},
@@ -639,29 +423,24 @@ export class ExactOnline implements INodeType {
 				const service = this.getNodeParameter('service', 0) as string;
 				const resource = this.getNodeParameter('resource', 0) as string;
 
-				// Special case for MatchSets - only offer postXml operation
-				if (service.toLowerCase() === 'financial' && resource === 'MatchSets') {
-					return [
-						{
-							name: 'POST (XML)',
-							value: 'postXml',
-						},
-					];
-				}
-
-				// Normal handling for all other resources
 				const endpointConfig = (await getEndpointConfig.call(
 					this,
 					service,
 					resource,
-				)) as endpointConfiguration;
-				const methods = endpointConfig.methods.map((x) => x.toLowerCase());
+				)) as EndpointConfiguration;
+
+				// If endpointConfig is not found, return empty options
+				if (!endpointConfig) {
+					return [];
+				}
+
+				const methods = endpointConfig.methods.map((x: string) => x.toLowerCase());
 				if (methods.includes('get')) {
 					methods.push('getAll');
 				}
 
-				// Conditionally add 'getAllViaParentId' for specific resources like BankEntryLines
-				if (service.toLowerCase() === 'financialtransaction' && resource === 'BankEntryLines') {
+				// Conditionally add 'getAllViaParentId' if parentResource is defined
+				if (endpointConfig.parentResource) {
 					methods.push('getAllViaParentId');
 				}
 
@@ -675,9 +454,9 @@ export class ExactOnline implements INodeType {
 					this,
 					service,
 					resource,
-				)) as endpointConfiguration;
+				)) as EndpointConfiguration;
 				const fields = await getFields.call(this, endpointConfig);
-				return toFieldSelectOptions(fields.map((x) => ({ name: x })) as LoadedFields[]);
+				return toFieldSelectOptions(fields.map((x: string) => ({ name: x })) as LoadedFields[]);
 			},
 
 			async getFieldsFilter(this: ILoadOptionsFunctions) {
@@ -687,10 +466,10 @@ export class ExactOnline implements INodeType {
 					this,
 					service,
 					resource,
-				)) as endpointConfiguration;
+				)) as EndpointConfiguration;
 				const fields = endpointConfig.fields;
 
-				return toFieldFilterOptions(fields as endpointFieldConfiguration[]);
+				return toFieldFilterOptions(fields as EndpointFieldConfiguration[]);
 			},
 
 			async getFieldsData(this: ILoadOptionsFunctions) {
@@ -700,7 +479,7 @@ export class ExactOnline implements INodeType {
 					this,
 					service,
 					resource,
-				)) as endpointConfiguration;
+				)) as EndpointConfiguration;
 				//exclude auto generated values, these cannot be set by the user.
 				const exclude = [
 					'Created',
@@ -712,10 +491,10 @@ export class ExactOnline implements INodeType {
 				];
 
 				const fields = endpointConfig.fields.filter(
-					(x) => !exclude.includes(x.name),
-				) as endpointFieldConfiguration[];
+					(x: EndpointFieldConfiguration) => !exclude.includes(x.name),
+				) as EndpointFieldConfiguration[];
 
-				return toFieldFilterOptions(fields as endpointFieldConfiguration[]);
+				return toFieldFilterOptions(fields as EndpointFieldConfiguration[]);
 			},
 		},
 	};
@@ -734,387 +513,232 @@ export class ExactOnline implements INodeType {
 		const service = this.getNodeParameter('service', 0, '') as string;
 		const resource = this.getNodeParameter('resource', 0, '') as string;
 		const operation = this.getNodeParameter('operation', 0, '') as string;
-		const endpointConfig = (await getEndpointConfig.call(
+		const endpointConfig = await getEndpointConfig.call(
 			this,
 			service,
 			resource,
-		)) as endpointConfiguration;
+		); // Returns EndpointConfiguration | undefined
+
+		if (!endpointConfig) {
+			throw new NodeOperationError(
+				this.getNode(),
+				`Configuration not found for service '${service}' and resource '${resource}'.`,
+				{ itemIndex: 0 },
+			);
+		}
+
+		// Determine API type and URI based on the loaded config
+		const apiType = endpointConfig.apiType; // Will be 'rest' or 'xml'
 		const uri = endpointConfig.uri.replace('{division}', division);
+
+		// REST specific fields (only needed for some REST ops)
 		const excludeSelection = this.getNodeParameter('excludeSelection', 0, false) as boolean;
 		const selectedFields = this.getNodeParameter('selectedFields', 0, []) as string[];
 		let onlyNotSelectedFields: string[] = [];
-		if (excludeSelection) {
+		if (apiType === 'rest' && excludeSelection) {
 			const allFields = await getFields.call(this, endpointConfig);
 			onlyNotSelectedFields = allFields.filter((x) => !selectedFields.includes(x));
 		}
 
 		for (let itemIndex = 0; itemIndex < length; itemIndex++) {
 			try {
-				if (operation === 'get') {
-					const qs: IDataObject = {};
-					const id = this.getNodeParameter('id', itemIndex, '') as string;
-					if (id !== '') {
-						qs['$filter'] = `ID eq guid'${id}'`;
-						qs['$top'] = 1;
-						responseData = await getData.call(this, uri, {}, qs);
-						returnData = returnData.concat(responseData);
-					}
-				}
-				if (operation === 'getAll') {
-					const qs: IDataObject = {};
-					const limit = this.getNodeParameter('limit', itemIndex, 0) as number;
-					const conjunction = this.getNodeParameter('conjunction', itemIndex, 'and') as string;
-					const filter = this.getNodeParameter('filter.filter', itemIndex, 0) as IDataObject[];
-					const ignoreRateLimit = this.getNodeParameter('ignoreRateLimit', 0, false) as boolean;
+				// --- Branch based on API Type --- //
+				if (apiType === 'xml') {
+					// --- XML Logic (Currently only POST for FFMatch) --- //
+					if (operation === 'post') {
+						const useManualBodyXml = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
+						let matchSets: MatchSet[] = [];
 
-					if (excludeSelection) {
-						qs['$select'] = onlyNotSelectedFields.join(',');
-					} else if (selectedFields.length > 0) {
-						qs['$select'] = selectedFields.join(',');
-					}
-					const filters = [];
-					if (filter.length > 0) {
-						for (let filterIndex = 0; filterIndex < filter.length; filterIndex++) {
-							const fieldName = filter[filterIndex].field as string;
-							const fieldType = await getFieldType.call(this, endpointConfig, fieldName);
-							const fieldValue = filter[filterIndex].value as string;
-							switch (fieldType) {
-								case 'string':
-									// Handle 'contains' operator specifically for strings, using OData v3 substringof
-									if (filter[filterIndex].operator === 'contains') {
-										filters.push(`substringof('${fieldValue}', ${fieldName})`); // Correct OData v3 syntax
-									} else {
-										// Existing logic for other string operators (eq, ne, etc.) - needs quotes
-										filters.push(`${fieldName} ${filter[filterIndex].operator} '${fieldValue}'`);
-									}
-									break;
-								case 'boolean':
-									filters.push(
-										`${fieldName} ${filter[filterIndex].operator} ${
-											fieldValue.toLowerCase() === 'true'
-										}`,
-									);
-									break;
-								case 'number':
-									filters.push(
-										`${fieldName} ${filter[filterIndex].operator} ${filter[filterIndex].value}`,
-									);
-									break;
-								default:
-									break;
-							}
-						}
-						if (filters.length > 0) {
-							qs['$filter'] = filters.join(` ${conjunction} `);
-						}
-					}
-
-					responseData = await getAllData.call(this, uri, limit, {}, qs, {}, ignoreRateLimit);
-					returnData = returnData.concat(responseData);
-				}
-
-				if (operation === 'getAllViaParentId') {
-					const parentId = this.getNodeParameter('parentId', itemIndex, '') as string;
-					const limit = this.getNodeParameter('limit', itemIndex, 60) as number;
-					const ignoreRateLimit = this.getNodeParameter('ignoreRateLimit', 0, false) as boolean;
-
-					if (parentId === '') {
-						throw new NodeOperationError(
-							this.getNode(),
-							'Parent ID is required for the getAllViaParentId operation.',
-							{ itemIndex },
-						);
-					}
-
-					const parentResource = 'BankEntries';
-					const specificUri = `/api/v1/${division}/${service}/${parentResource}(guid'${parentId}')/${resource}`;
-
-					responseData = await getAllData.call(
-						this,
-						specificUri,
-						limit,
-						{},
-						{},
-						{},
-						ignoreRateLimit,
-					);
-					returnData = returnData.concat(responseData);
-				}
-
-				if (operation === 'post') {
-					let body: IDataObject = {};
-
-					const useManualBody = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
-					if (useManualBody) {
-						const manualBody = this.getNodeParameter('manualBody', itemIndex, {}) as IDataObject;
-						if (!manualBody) {
-							throw new NodeOperationError(
-								this.getNode(),
-								`Please include the fields and values for the item you want to create.`,
-								{
-									itemIndex,
-								},
-							);
-						}
-						body = manualBody;
-					} else {
-						const data = this.getNodeParameter('data.field', itemIndex, 0) as IDataObject[];
-						if (!data) {
-							throw new NodeOperationError(
-								this.getNode(),
-								`Please include the fields and values for the item you want to create.`,
-								{
-									itemIndex,
-								},
-							);
-						}
-						const fieldsEntered = data.map((x) => x.fieldName);
-						const mandatoryFields = (await getMandatoryFields.call(
-							this,
-							endpointConfig,
-						)) as string[];
-						const mandatoryFieldsNotIncluded = mandatoryFields.filter(
-							(x) => !fieldsEntered.includes(x),
-						);
-						if (mandatoryFieldsNotIncluded.length > 0) {
-							throw new NodeOperationError(
-								this.getNode(),
-								`The following fields are mandatory and did not get used: '${mandatoryFieldsNotIncluded.join(
-									', ',
-								)}'`,
-								{
-									itemIndex,
-								},
-							);
-						}
-						if (data.length > 0) {
-							for (let dataIndex = 0; dataIndex < data.length; dataIndex++) {
-								const fieldName = data[dataIndex].fieldName as string;
-								const fieldType = await getFieldType.call(this, endpointConfig, fieldName);
-								const fieldValue = data[dataIndex].fieldValue as string;
-								switch (fieldType) {
-									case 'string':
-										body[`${fieldName}`] = fieldValue;
-										break;
-									case 'boolean':
-										body[`${fieldName}`] = fieldValue.toLocaleLowerCase() === 'true';
-										break;
-									case 'number':
-										body[`${fieldName}`] = +fieldValue;
-										break;
-									default:
-										break;
+						if (useManualBodyXml) {
+							const manualBodyRaw = this.getNodeParameter('manualBody', itemIndex, '') as string;
+							try {
+								const parsedBody = JSON.parse(manualBodyRaw);
+								if (!Array.isArray(parsedBody)) {
+									throw new Error('Manual JSON Body must be a JSON array of MatchSet objects.');
 								}
+								matchSets = parsedBody as MatchSet[];
+							} catch (e) {
+								throw new NodeOperationError(this.getNode(), `Invalid JSON provided in Manual JSON Body: ${e.message}`, { itemIndex: itemIndex });
 							}
-						}
-					}
-
-					responseData = await exactOnlineApiRequest.call(
-						this,
-						'Post',
-						uri,
-						body,
-						{},
-						{ headers: { Prefer: 'return=representation' } },
-					);
-					returnData = returnData.concat(responseData.body.d);
-				}
-
-				if (operation === 'put') {
-					const id = this.getNodeParameter('id', itemIndex, '') as string;
-					if (id === '') {
-						throw new NodeOperationError(
-							this.getNode(),
-							`Please enter an Id of a record to edit.`,
-							{
-								itemIndex,
-							},
-						);
-					}
-					let body: IDataObject = {};
-
-					const useManualBody = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
-					if (useManualBody) {
-						const manualBody = this.getNodeParameter('manualBody', itemIndex, {}) as IDataObject;
-						if (!manualBody) {
-							throw new NodeOperationError(
-								this.getNode(),
-								`Please include the fields and values for the item you want to edit.`,
-								{
-									itemIndex,
-								},
-							);
-						}
-						body = manualBody;
-					} else {
-						const data = this.getNodeParameter('data.field', itemIndex, 0) as IDataObject[];
-						if (!data) {
-							throw new NodeOperationError(
-								this.getNode(),
-								`Please include the fields and values for the item you want to edit.`,
-								{
-									itemIndex,
-								},
-							);
-						}
-
-						if (data.length > 0) {
-							for (let dataIndex = 0; dataIndex < data.length; dataIndex++) {
-								const fieldName = data[dataIndex].fieldName as string;
-								const fieldType = await getFieldType.call(this, endpointConfig, fieldName);
-								const fieldValue = data[dataIndex].fieldValue as string;
-								switch (fieldType) {
-									case 'string':
-										body[`${fieldName}`] = fieldValue;
-										break;
-									case 'boolean':
-										body[`${fieldName}`] = fieldValue.toLocaleLowerCase() === 'true';
-										break;
-									case 'number':
-										body[`${fieldName}`] = +fieldValue;
-										break;
-									default:
-										break;
-								}
-							}
-						}
-					}
-					const uriWithId = `${uri}(guid'${id}')`;
-					responseData = await exactOnlineApiRequest.call(this, 'Put', uriWithId, body, {});
-					if (responseData.statusCode === 204) {
-						returnData = returnData.concat({ msg: 'Succesfully changed field values.' });
-					} else {
-						throw new NodeOperationError(this.getNode(), `Something went wrong.`, {
-							itemIndex,
-						});
-					}
-				}
-
-				if (operation === 'delete') {
-					const id = this.getNodeParameter('id', itemIndex, '') as string;
-					if (id === '') {
-						throw new NodeOperationError(
-							this.getNode(),
-							`Please enter an Id of a record to delete.`,
-							{
-								itemIndex,
-							},
-						);
-					}
-					const uriWithId = `${uri}(guid'${id}')`;
-					responseData = await exactOnlineApiRequest.call(this, 'Delete', uriWithId, {}, {});
-					if (responseData.statusCode === 204) {
-						returnData = returnData.concat({ msg: 'Succesfully Deleted record.' });
-					} else {
-						throw new NodeOperationError(this.getNode(), `Something went wrong.`, {
-							itemIndex,
-						});
-					}
-				}
-
-				if (operation === 'postXml') {
-					// Get the reconciliation parameters
-					const matchSetData = this.getNodeParameter(
-						'reconciliation.matchSet',
-						itemIndex,
-						{},
-					) as IDataObject;
-					const transactionsData = this.getNodeParameter(
-						'transactions.transaction',
-						itemIndex,
-						[],
-					) as IDataObject[];
-
-					if (!matchSetData.glAccountCode) {
-						throw new NodeOperationError(
-							this.getNode(),
-							'Please provide GL Account Code for reconciliation',
-							{ itemIndex },
-						);
-					}
-
-					if (transactionsData.length < 2) {
-						throw new NodeOperationError(
-							this.getNode(),
-							'At least two transactions are required for reconciliation',
-							{ itemIndex },
-						);
-					}
-
-					// Prepare match lines
-					const matchLines: ReconciledTransaction[] = transactionsData.map((transaction) => ({
-						finYear: transaction.finYear as string,
-						finPeriod: transaction.finPeriod as string,
-						journal: transaction.journal as string,
-						entry: transaction.entry as string,
-						amountDC: transaction.amountDC as string,
-					}));
-
-					// Prepare match set
-					const matchSet: MatchSet = {
-						GLAccount: matchSetData.glAccountCode as string,
-						MatchLines: matchLines,
-					};
-
-					// Add Account if provided (required for receivable/payable GL accounts)
-					if (matchSetData.accountCode) {
-						matchSet.Account = matchSetData.accountCode as string;
-					}
-
-					// Add write-off information if needed
-					if (matchSetData.includeWriteOff === true) {
-						const writeOff: WriteOff = {
-							type: (matchSetData.writeOffType as string) || '4',
-						};
-
-						// Only add fields if they are provided
-						if (matchSetData.writeOffGLAccount) {
-							writeOff.GLAccount = matchSetData.writeOffGLAccount as string;
-						}
-
-						if (matchSetData.writeOffDescription) {
-							writeOff.Description = matchSetData.writeOffDescription as string;
-						}
-
-						if (matchSetData.writeOffFinYear) {
-							writeOff.FinYear = matchSetData.writeOffFinYear as string;
-						}
-
-						if (matchSetData.writeOffFinPeriod) {
-							writeOff.FinPeriod = matchSetData.writeOffFinPeriod as string;
-						}
-
-						if (matchSetData.writeOffDate) {
-							writeOff.Date = matchSetData.writeOffDate as string;
-						}
-
-						matchSet.WriteOff = writeOff;
-					}
-
-					// Create XML for the reconciliation
-					const xmlBody = createReconciliationXml([matchSet]);
-
-					// Send XML request
-					try {
-						const response = await exactOnlineXmlRequest.call(this, division, 'FFMatch', xmlBody);
-
-						if (response.statusCode === 200) {
-							returnData.push({
-								success: true,
-								message: 'Reconciliation completed successfully',
-								response: response.body,
-							});
 						} else {
-							throw new NodeOperationError(
-								this.getNode(),
-								`Failed to reconcile: ${response.statusCode} ${response.body}`,
-								{ itemIndex },
-							);
+							const matchSetData = this.getNodeParameter('reconciliation.matchSet', itemIndex, {}) as IDataObject;
+							const transactionsData = this.getNodeParameter('transactions.transaction', itemIndex, []) as IDataObject[];
+							if (!matchSetData.glAccountCode) throw new NodeOperationError(this.getNode(), 'Please provide GL Account Code for reconciliation', { itemIndex: itemIndex });
+							if (transactionsData.length < 2) throw new NodeOperationError(this.getNode(), 'At least two transactions are required for reconciliation', { itemIndex: itemIndex });
+							const matchLines: ReconciledTransaction[] = transactionsData.map((t) => ({ finYear: t.finYear as string, finPeriod: t.finPeriod as string, journal: t.journal as string, entry: t.entry as string, amountDC: t.amountDC as string }));
+							const matchSet: MatchSet = { GLAccount: matchSetData.glAccountCode as string, MatchLines: matchLines };
+							if (matchSetData.accountCode) matchSet.Account = matchSetData.accountCode as string;
+							if (matchSetData.includeWriteOff === true) {
+								const writeOff: WriteOff = { type: (matchSetData.writeOffType as string) || '4' };
+								if (matchSetData.writeOffGLAccount) writeOff.GLAccount = matchSetData.writeOffGLAccount as string;
+								if (matchSetData.writeOffDescription) writeOff.Description = matchSetData.writeOffDescription as string;
+								if (matchSetData.writeOffFinYear) writeOff.FinYear = matchSetData.writeOffFinYear as string;
+								if (matchSetData.writeOffFinPeriod) writeOff.FinPeriod = matchSetData.writeOffFinPeriod as string;
+								if (matchSetData.writeOffDate) writeOff.Date = matchSetData.writeOffDate as string;
+								matchSet.WriteOff = writeOff;
+							}
+							matchSets = [matchSet];
 						}
-					} catch (error) {
-						throw new NodeOperationError(this.getNode(), `Failed to reconcile: ${error.message}`, {
-							itemIndex,
-						});
+
+						if (matchSets.length === 0) throw new NodeOperationError(this.getNode(), 'No valid MatchSet data found to process.', { itemIndex: itemIndex });
+
+						const xmlBody = createReconciliationXml(matchSets);
+						try {
+							// Use endpoint name (topic) from config
+							const response = await exactOnlineXmlRequest.call(this, division, endpointConfig.endpoint, xmlBody);
+							if (response.statusCode === 200) {
+								returnData.push({ success: true, message: 'Reconciliation completed successfully', response: response.body });
+							} else {
+								throw new NodeOperationError(this.getNode(), `Failed to reconcile: ${response.statusCode} ${response.body}`, { itemIndex: itemIndex });
+							}
+						} catch (error) {
+							throw new NodeOperationError(this.getNode(), `Failed to reconcile: ${error.message}`, { itemIndex: itemIndex });
+						}
+					} else {
+						// Handle other potential XML operations if added later
+						throw new NodeOperationError(this.getNode(), `Operation '${operation}' not supported for XML endpoint '${endpointConfig.endpoint}'.`, { itemIndex: itemIndex });
+					}
+				} else {
+					// --- REST API Logic --- //
+					switch (operation) {
+						case 'get': {
+							const qs: IDataObject = {};
+							const id = this.getNodeParameter('id', itemIndex, '') as string;
+							if (id !== '') {
+								qs['$filter'] = `ID eq guid'${id}'`;
+								qs['$top'] = 1;
+								responseData = await getData.call(this, uri, {}, qs);
+								returnData = returnData.concat(responseData);
+							}
+							break;
+						}
+						case 'getAll': {
+							const qs: IDataObject = {};
+							const limit = this.getNodeParameter('limit', itemIndex, 0) as number;
+							const conjunction = this.getNodeParameter('conjunction', itemIndex, 'and') as string;
+							const filter = this.getNodeParameter('filter.filter', itemIndex, 0) as IDataObject[];
+							const ignoreRateLimit = this.getNodeParameter('ignoreRateLimit', 0, false) as boolean;
+
+							if (excludeSelection) {
+								qs['$select'] = onlyNotSelectedFields.join(',');
+							} else if (selectedFields.length > 0) {
+								qs['$select'] = selectedFields.join(',');
+							}
+							const filters = [];
+							if (filter.length > 0) {
+								for (let filterIndex = 0; filterIndex < filter.length; filterIndex++) {
+									const fieldName = filter[filterIndex].field as string;
+									const fieldType = await getFieldType.call(this, endpointConfig, fieldName);
+									const fieldValue = filter[filterIndex].value as string;
+									switch (fieldType) {
+										case 'Edm.String': const op = filter[filterIndex].operator; const fStr = op === 'contains' ? `substringof('${fieldValue}', ${fieldName})` : `${fieldName} ${op} '${fieldValue}'`; filters.push(fStr); break;
+										case 'Edm.Guid': filters.push(`${fieldName} ${filter[filterIndex].operator} guid'${fieldValue}'`); break;
+										case 'Edm.DateTime': filters.push(`${fieldName} ${filter[filterIndex].operator} datetime'${fieldValue}'`); break;
+										case 'Edm.Boolean': filters.push(`${fieldName} ${filter[filterIndex].operator} ${fieldValue.toLowerCase() === 'true'}`); break;
+										case 'Edm.Int16': case 'Edm.Int32': case 'Edm.Int64': case 'Edm.Double': case 'Edm.Decimal': case 'Edm.Byte': filters.push(`${fieldName} ${filter[filterIndex].operator} ${filter[filterIndex].value}`); break;
+										default: break;
+									}
+								}
+								if (filters.length > 0) qs['$filter'] = filters.join(` ${conjunction} `);
+							}
+							responseData = await getAllData.call(this, uri, limit, {}, qs, {}, ignoreRateLimit);
+							returnData = returnData.concat(responseData);
+							break;
+						}
+						case 'getAllViaParentId': {
+							const parentId = this.getNodeParameter('parentId', itemIndex, '') as string;
+							const limit = this.getNodeParameter('limit', itemIndex, 60) as number;
+							const ignoreRateLimit = this.getNodeParameter('ignoreRateLimit', 0, false) as boolean;
+							if (!endpointConfig.parentResource) throw new NodeOperationError(this.getNode(), `Operation 'getAllViaParentId' is not supported for resource '${resource}' as it lacks a defined parent resource in the configuration.`, { itemIndex: itemIndex });
+							if (parentId === '') throw new NodeOperationError(this.getNode(), 'Parent ID is required for the getAllViaParentId operation.', { itemIndex: itemIndex });
+							const parentResource = endpointConfig.parentResource;
+							const specificUri = `/api/v1/${division}/${service}/${parentResource}(guid'${parentId}')/${resource}`;
+							responseData = await getAllData.call(this, specificUri, limit, {}, {}, {}, ignoreRateLimit);
+							returnData = returnData.concat(responseData);
+							break;
+						}
+						case 'post': {
+							let body: IDataObject = {};
+							const useManualBodyRest = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
+							if (useManualBodyRest) {
+								const manualBody = this.getNodeParameter('manualBody', itemIndex, {}) as IDataObject;
+								if (!manualBody) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to create.`, { itemIndex: itemIndex });
+								body = manualBody;
+							} else {
+								const data = this.getNodeParameter('data.field', itemIndex, 0) as IDataObject[];
+								if (!data) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to create.`, { itemIndex: itemIndex });
+								const fieldsEntered = data.map((x) => x.fieldName);
+								const mandatoryFields = (await getMandatoryFields.call(this, endpointConfig)) as string[];
+								const mandatoryFieldsNotIncluded = mandatoryFields.filter((x) => !fieldsEntered.includes(x));
+								if (mandatoryFieldsNotIncluded.length > 0) throw new NodeOperationError(this.getNode(), `The following fields are mandatory and did not get used: '${mandatoryFieldsNotIncluded.join(', ')}'`, { itemIndex: itemIndex });
+								if (data.length > 0) {
+									for (let dataIndex = 0; dataIndex < data.length; dataIndex++) {
+										const fieldName = data[dataIndex].fieldName as string;
+										const fieldType = await getFieldType.call(this, endpointConfig, fieldName);
+										const fieldValue = data[dataIndex].fieldValue as string;
+										switch (fieldType) {
+											case 'Edm.String': case 'Edm.Guid': case 'Edm.DateTime': body[`${fieldName}`] = fieldValue; break;
+											case 'Edm.Boolean': body[`${fieldName}`] = fieldValue.toLocaleLowerCase() === 'true'; break;
+											case 'Edm.Int16': case 'Edm.Int32': case 'Edm.Int64': case 'Edm.Double': case 'Edm.Decimal': case 'Edm.Byte': body[`${fieldName}`] = +fieldValue; break;
+											default: break;
+										}
+									}
+								}
+							}
+							responseData = await exactOnlineApiRequest.call(this, 'Post', uri, body, {}, { headers: { Prefer: 'return=representation' } });
+							returnData = returnData.concat(responseData.body.d);
+							break;
+						}
+						case 'put': {
+							const id = this.getNodeParameter('id', itemIndex, '') as string;
+							if (id === '') throw new NodeOperationError(this.getNode(), `Please enter an Id of a record to edit.`, { itemIndex: itemIndex });
+							let body: IDataObject = {};
+							const useManualBodyRest = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
+							if (useManualBodyRest) {
+								const manualBody = this.getNodeParameter('manualBody', itemIndex, {}) as IDataObject;
+								if (!manualBody) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to edit.`, { itemIndex: itemIndex });
+								body = manualBody;
+							} else {
+								const data = this.getNodeParameter('data.field', itemIndex, 0) as IDataObject[];
+								if (!data) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to edit.`, { itemIndex: itemIndex });
+								if (data.length > 0) {
+									for (let dataIndex = 0; dataIndex < data.length; dataIndex++) {
+										const fieldName = data[dataIndex].fieldName as string;
+										const fieldType = await getFieldType.call(this, endpointConfig, fieldName);
+										const fieldValue = data[dataIndex].fieldValue as string;
+										switch (fieldType) {
+											case 'Edm.String': case 'Edm.Guid': case 'Edm.DateTime': body[`${fieldName}`] = fieldValue; break;
+											case 'Edm.Boolean': body[`${fieldName}`] = fieldValue.toLocaleLowerCase() === 'true'; break;
+											case 'Edm.Int16': case 'Edm.Int32': case 'Edm.Int64': case 'Edm.Double': case 'Edm.Decimal': case 'Edm.Byte': body[`${fieldName}`] = +fieldValue; break;
+											default: break;
+										}
+									}
+								}
+							}
+							const uriWithId = `${uri}(guid'${id}')`;
+							responseData = await exactOnlineApiRequest.call(this, 'Put', uriWithId, body, {});
+							if (responseData.statusCode === 204) {
+								returnData = returnData.concat({ msg: 'Succesfully changed field values.' });
+							} else {
+								throw new NodeOperationError(this.getNode(), `Something went wrong.`, { itemIndex: itemIndex });
+							}
+							break;
+						}
+						case 'delete': {
+							const id = this.getNodeParameter('id', itemIndex, '') as string;
+							if (id === '') throw new NodeOperationError(this.getNode(), `Please enter an Id of a record to delete.`, { itemIndex: itemIndex });
+							const uriWithId = `${uri}(guid'${id}')`;
+							responseData = await exactOnlineApiRequest.call(this, 'Delete', uriWithId, {}, {});
+							if (responseData.statusCode === 204) {
+								returnData = returnData.concat({ msg: 'Succesfully Deleted record.' });
+							} else {
+								throw new NodeOperationError(this.getNode(), `Something went wrong.`, { itemIndex: itemIndex });
+							}
+							break;
+						}
+						default: {
+							throw new NodeOperationError(this.getNode(), `Operation '${operation}' is not supported for REST API endpoint '${endpointConfig.endpoint}'.`, { itemIndex: itemIndex });
+						}
 					}
 				}
 			} catch (error) {
@@ -1131,7 +755,7 @@ export class ExactOnline implements INodeType {
 						throw error;
 					}
 					throw new NodeOperationError(this.getNode(), error, {
-						itemIndex,
+						itemIndex: itemIndex,
 					});
 				}
 			}
