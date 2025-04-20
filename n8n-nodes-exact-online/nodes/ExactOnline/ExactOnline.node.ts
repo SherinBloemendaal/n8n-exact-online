@@ -558,13 +558,13 @@ export class ExactOnline implements INodeType {
 								}
 								matchSets = parsedBody as MatchSet[];
 							} catch (e) {
-								throw new NodeOperationError(this.getNode(), `Invalid JSON provided in Manual JSON Body: ${e.message}`, { itemIndex: itemIndex });
+								throw new NodeOperationError(this.getNode(), `Invalid JSON provided in Manual JSON Body: ${e.message}`, { itemIndex });
 							}
 						} else {
 							const matchSetData = this.getNodeParameter('reconciliation.matchSet', itemIndex, {}) as IDataObject;
 							const transactionsData = this.getNodeParameter('transactions.transaction', itemIndex, []) as IDataObject[];
-							if (!matchSetData.glAccountCode) throw new NodeOperationError(this.getNode(), 'Please provide GL Account Code for reconciliation', { itemIndex: itemIndex });
-							if (transactionsData.length < 2) throw new NodeOperationError(this.getNode(), 'At least two transactions are required for reconciliation', { itemIndex: itemIndex });
+							if (!matchSetData.glAccountCode) throw new NodeOperationError(this.getNode(), 'Please provide GL Account Code for reconciliation', { itemIndex });
+							if (transactionsData.length < 2) throw new NodeOperationError(this.getNode(), 'At least two transactions are required for reconciliation', { itemIndex });
 							const matchLines: ReconciledTransaction[] = transactionsData.map((t) => ({ finYear: t.finYear as string, finPeriod: t.finPeriod as string, journal: t.journal as string, entry: t.entry as string, amountDC: t.amountDC as string }));
 							const matchSet: MatchSet = { GLAccount: matchSetData.glAccountCode as string, MatchLines: matchLines };
 							if (matchSetData.accountCode) matchSet.Account = matchSetData.accountCode as string;
@@ -580,7 +580,7 @@ export class ExactOnline implements INodeType {
 							matchSets = [matchSet];
 						}
 
-						if (matchSets.length === 0) throw new NodeOperationError(this.getNode(), 'No valid MatchSet data found to process.', { itemIndex: itemIndex });
+						if (matchSets.length === 0) throw new NodeOperationError(this.getNode(), 'No valid MatchSet data found to process.', { itemIndex });
 
 						const xmlBody = createReconciliationXml(matchSets);
 
@@ -592,14 +592,14 @@ export class ExactOnline implements INodeType {
 							if (response.statusCode === 200) {
 								returnData.push({ success: true, message: 'Reconciliation completed successfully', response: response.body });
 							} else {
-								throw new NodeOperationError(this.getNode(), `Failed to reconcile: ${response.statusCode} ${response.body}`, { itemIndex: itemIndex });
+								throw new NodeOperationError(this.getNode(), `Failed to reconcile: ${response.statusCode} ${response.body}`, { itemIndex });
 							}
 						} catch (error) {
-							throw new NodeOperationError(this.getNode(), `Failed to reconcile: ${error.message}`, { itemIndex: itemIndex });
+							throw new NodeOperationError(this.getNode(), `Failed to reconcile: ${error.message}`, { itemIndex });
 						}
 					} else {
 						// Handle other potential XML operations if added later
-						throw new NodeOperationError(this.getNode(), `Operation '${operation}' not supported for XML endpoint '${endpointConfig.endpoint}'.`, { itemIndex: itemIndex });
+						throw new NodeOperationError(this.getNode(), `Operation '${operation}' not supported for XML endpoint '${endpointConfig.endpoint}'.`, { itemIndex });
 					}
 				} else {
 					// --- REST API Logic --- //
@@ -652,8 +652,8 @@ export class ExactOnline implements INodeType {
 							const parentId = this.getNodeParameter('parentId', itemIndex, '') as string;
 							const limit = this.getNodeParameter('limit', itemIndex, 60) as number;
 							const ignoreRateLimit = this.getNodeParameter('ignoreRateLimit', 0, false) as boolean;
-							if (!endpointConfig.parentResource) throw new NodeOperationError(this.getNode(), `Operation 'getAllViaParentId' is not supported for resource '${resource}' as it lacks a defined parent resource in the configuration.`, { itemIndex: itemIndex });
-							if (parentId === '') throw new NodeOperationError(this.getNode(), 'Parent ID is required for the getAllViaParentId operation.', { itemIndex: itemIndex });
+							if (!endpointConfig.parentResource) throw new NodeOperationError(this.getNode(), `Operation 'getAllViaParentId' is not supported for resource '${resource}' as it lacks a defined parent resource in the configuration.`, { itemIndex });
+							if (parentId === '') throw new NodeOperationError(this.getNode(), 'Parent ID is required for the getAllViaParentId operation.', { itemIndex });
 							const parentResource = endpointConfig.parentResource;
 							const specificUri = `/api/v1/${division}/${service}/${parentResource}(guid'${parentId}')/${resource}`;
 							responseData = await getAllData.call(this, specificUri, limit, {}, {}, {}, ignoreRateLimit);
@@ -665,15 +665,15 @@ export class ExactOnline implements INodeType {
 							const useManualBodyRest = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
 							if (useManualBodyRest) {
 								const manualBody = this.getNodeParameter('manualBody', itemIndex, {}) as IDataObject;
-								if (!manualBody) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to create.`, { itemIndex: itemIndex });
+								if (!manualBody) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to create.`, { itemIndex });
 								body = manualBody;
 							} else {
 								const data = this.getNodeParameter('data.field', itemIndex, 0) as IDataObject[];
-								if (!data) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to create.`, { itemIndex: itemIndex });
+								if (!data) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to create.`, { itemIndex });
 								const fieldsEntered = data.map((x) => x.fieldName);
 								const mandatoryFields = (await getMandatoryFields.call(this, endpointConfig)) as string[];
 								const mandatoryFieldsNotIncluded = mandatoryFields.filter((x) => !fieldsEntered.includes(x));
-								if (mandatoryFieldsNotIncluded.length > 0) throw new NodeOperationError(this.getNode(), `The following fields are mandatory and did not get used: '${mandatoryFieldsNotIncluded.join(', ')}'`, { itemIndex: itemIndex });
+								if (mandatoryFieldsNotIncluded.length > 0) throw new NodeOperationError(this.getNode(), `The following fields are mandatory and did not get used: '${mandatoryFieldsNotIncluded.join(', ')}'`, { itemIndex });
 								if (data.length > 0) {
 									for (let dataIndex = 0; dataIndex < data.length; dataIndex++) {
 										const fieldName = data[dataIndex].fieldName as string;
@@ -694,16 +694,16 @@ export class ExactOnline implements INodeType {
 						}
 						case 'put': {
 							const id = this.getNodeParameter('id', itemIndex, '') as string;
-							if (id === '') throw new NodeOperationError(this.getNode(), `Please enter an Id of a record to edit.`, { itemIndex: itemIndex });
+							if (id === '') throw new NodeOperationError(this.getNode(), `Please enter an Id of a record to edit.`, { itemIndex });
 							let body: IDataObject = {};
 							const useManualBodyRest = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
 							if (useManualBodyRest) {
 								const manualBody = this.getNodeParameter('manualBody', itemIndex, {}) as IDataObject;
-								if (!manualBody) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to edit.`, { itemIndex: itemIndex });
+								if (!manualBody) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to edit.`, { itemIndex });
 								body = manualBody;
 							} else {
 								const data = this.getNodeParameter('data.field', itemIndex, 0) as IDataObject[];
-								if (!data) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to edit.`, { itemIndex: itemIndex });
+								if (!data) throw new NodeOperationError(this.getNode(), `Please include the fields and values for the item you want to edit.`, { itemIndex });
 								if (data.length > 0) {
 									for (let dataIndex = 0; dataIndex < data.length; dataIndex++) {
 										const fieldName = data[dataIndex].fieldName as string;
@@ -723,24 +723,24 @@ export class ExactOnline implements INodeType {
 							if (responseData.statusCode === 204) {
 								returnData = returnData.concat({ msg: 'Succesfully changed field values.' });
 							} else {
-								throw new NodeOperationError(this.getNode(), `Something went wrong.`, { itemIndex: itemIndex });
+								throw new NodeOperationError(this.getNode(), `Something went wrong.`, { itemIndex });
 							}
 							break;
 						}
 						case 'delete': {
 							const id = this.getNodeParameter('id', itemIndex, '') as string;
-							if (id === '') throw new NodeOperationError(this.getNode(), `Please enter an Id of a record to delete.`, { itemIndex: itemIndex });
+							if (id === '') throw new NodeOperationError(this.getNode(), `Please enter an Id of a record to delete.`, { itemIndex });
 							const uriWithId = `${uri}(guid'${id}')`;
 							responseData = await exactOnlineApiRequest.call(this, 'Delete', uriWithId, {}, {});
 							if (responseData.statusCode === 204) {
 								returnData = returnData.concat({ msg: 'Succesfully Deleted record.' });
 							} else {
-								throw new NodeOperationError(this.getNode(), `Something went wrong.`, { itemIndex: itemIndex });
+								throw new NodeOperationError(this.getNode(), `Something went wrong.`, { itemIndex });
 							}
 							break;
 						}
 						default: {
-							throw new NodeOperationError(this.getNode(), `Operation '${operation}' is not supported for REST API endpoint '${endpointConfig.endpoint}'.`, { itemIndex: itemIndex });
+							throw new NodeOperationError(this.getNode(), `Operation '${operation}' is not supported for REST API endpoint '${endpointConfig.endpoint}'.`, { itemIndex });
 						}
 					}
 				}
@@ -758,7 +758,7 @@ export class ExactOnline implements INodeType {
 						throw error;
 					}
 					throw new NodeOperationError(this.getNode(), error, {
-						itemIndex: itemIndex,
+						itemIndex,
 					});
 				}
 			}
