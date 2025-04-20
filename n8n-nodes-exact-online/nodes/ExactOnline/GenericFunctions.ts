@@ -1,5 +1,5 @@
 import { OptionsWithUri } from 'request';
-import config from "./fieldConfigArray.json";
+import config from './fieldConfigArray.json';
 
 import {
 	IExecuteFunctions,
@@ -9,8 +9,14 @@ import {
 } from 'n8n-core';
 
 import { IDataObject, IOAuth2Options, NodeApiError, NodeOperationError } from 'n8n-workflow';
-import { endpointConfiguration, endpointFieldConfiguration, LoadedDivision, LoadedFields, LoadedOptions, MatchSet } from './types';
-
+import {
+	endpointConfiguration,
+	endpointFieldConfiguration,
+	LoadedDivision,
+	LoadedFields,
+	LoadedOptions,
+	MatchSet,
+} from './types';
 
 export async function exactOnlineApiRequest(
 	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
@@ -29,17 +35,13 @@ export async function exactOnlineApiRequest(
 		method,
 		body,
 		qs,
-		uri: ``,//`${credentials.url}${uri}`,
+		uri: ``, //`${credentials.url}${uri}`,
 		json: true,
 		//@ts-ignore
 		resolveWithFullResponse: true,
 	};
 
-	const authenticationMethod = this.getNodeParameter(
-		'authentication',
-		0,
-		'accessToken',
-	) as string;
+	const authenticationMethod = this.getNodeParameter('authentication', 0, 'accessToken') as string;
 	let credentialType = '';
 	if (authenticationMethod === 'accessToken') {
 		const credentials = await this.getCredentials('exactOnlineApi');
@@ -55,7 +57,7 @@ export async function exactOnlineApiRequest(
 		options.uri = `${baseUrl}${uri}`;
 	}
 
-	if(nextPageUrl!==''){
+	if (nextPageUrl !== '') {
 		options.uri = nextPageUrl;
 	}
 	options = Object.assign({}, options, option);
@@ -90,122 +92,137 @@ export async function exactOnlineApiRequest(
 	}
 }
 
-export async function getCurrentDivision(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	): Promise<string> {
-		const responseData = await exactOnlineApiRequest.call(this, 'GET', `/api/v1/current/Me?$select=CurrentDivision`);
-		return responseData.body.d.results[0].CurrentDivision;
+export async function getCurrentDivision(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+): Promise<string> {
+	const responseData = await exactOnlineApiRequest.call(
+		this,
+		'GET',
+		`/api/v1/current/Me?$select=CurrentDivision`,
+	);
+	return responseData.body.d.results[0].CurrentDivision;
 }
 
-export async function getData(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+export async function getData(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
 	uri: string,
 	body: IDataObject = {},
 	qs: IDataObject = {},
 	option: IDataObject = {},
-	): Promise<IDataObject[]> {
-		const responseData = await exactOnlineApiRequest.call(this, 'GET', uri,body,qs,option);
-		if(responseData.body.d.results){
-			return [].concat(responseData.body.d.results);
-		}
-		else{
-			return [].concat(responseData.body.d);
-		}
-
+): Promise<IDataObject[]> {
+	const responseData = await exactOnlineApiRequest.call(this, 'GET', uri, body, qs, option);
+	if (responseData.body.d.results) {
+		return [].concat(responseData.body.d.results);
+	} else {
+		return [].concat(responseData.body.d);
+	}
 }
 
-export async function getAllData(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+export async function getAllData(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
 	uri: string,
 	limit = 60,
 	body: IDataObject = {},
 	qs: IDataObject = {},
 	option: IDataObject = {},
- 	ignoreRateLimit = false,
-	): Promise<IDataObject[]> {
-		let returnData:IDataObject[] = [];
-		let responseData;
-		let nextPageUrl = '';
-		do {
-			if(nextPageUrl === ''){
-				responseData = await exactOnlineApiRequest.call(this,'GET', uri,body,qs,option);
-			}
-			else{
-				responseData = await exactOnlineApiRequest.call(this, 'GET', uri,body,{},option,nextPageUrl);
-			}
-
-			if(responseData.body.d.results){
-				returnData = returnData.concat(responseData.body.d.results);
-			}
-			else{
-				returnData = returnData.concat(responseData.body.d);
-			}
-			nextPageUrl = responseData.body.d.__next;
-
-			if (!ignoreRateLimit && responseData.headers['x-ratelimit-minutely-remaining'] === "0") {
-				const waitTime = (+responseData.headers['x-ratelimit-minutely-reset']) - Date.now();
-				if (waitTime >= 0) {
-					await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 60000)));
-				}
-			}
-
-		} while ((limit === 0 || returnData.length < limit) && responseData.body.d.__next);
-		if(limit !== 0){
-			return returnData.slice(0,limit);
+	ignoreRateLimit = false,
+): Promise<IDataObject[]> {
+	let returnData: IDataObject[] = [];
+	let responseData;
+	let nextPageUrl = '';
+	do {
+		if (nextPageUrl === '') {
+			responseData = await exactOnlineApiRequest.call(this, 'GET', uri, body, qs, option);
+		} else {
+			responseData = await exactOnlineApiRequest.call(
+				this,
+				'GET',
+				uri,
+				body,
+				{},
+				option,
+				nextPageUrl,
+			);
 		}
-		return returnData;
 
+		if (responseData.body.d.results) {
+			returnData = returnData.concat(responseData.body.d.results);
+		} else {
+			returnData = returnData.concat(responseData.body.d);
+		}
+		nextPageUrl = responseData.body.d.__next;
+
+		if (!ignoreRateLimit && responseData.headers['x-ratelimit-minutely-remaining'] === '0') {
+			const waitTime = +responseData.headers['x-ratelimit-minutely-reset'] - Date.now();
+			if (waitTime >= 0) {
+				await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 60000)));
+			}
+		}
+	} while ((limit === 0 || returnData.length < limit) && responseData.body.d.__next);
+	if (limit !== 0) {
+		return returnData.slice(0, limit);
+	}
+	return returnData;
 }
-export async function getFields(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	endpointConfig:endpointConfiguration): Promise<string[]> {
-
-			return endpointConfig.fields.map(a => a.name);
-
-}
-
-export async function getMandatoryFields(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	endpointConfig:endpointConfiguration): Promise<string[]> {
-
-			return endpointConfig.fields.filter(x => x.mandatory === true).map(a => a.name);
-
-}
-
-export async function getServiceOptions(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions){
-
-	return config.map(x  => x.service.toLocaleLowerCase());
-
-}
-export async function getFieldType(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	endpointConfig:endpointConfiguration,
-	fieldName:string): Promise<string> {
-
-		return (endpointConfig.fields.filter(a => a.name === fieldName)[0].type ?? 'string');
-
+export async function getFields(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+	endpointConfig: endpointConfiguration,
+): Promise<string[]> {
+	return endpointConfig.fields.map((a) => a.name);
 }
 
-export async function getResourceOptions(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	service:string){
-
-	return config.filter(x => x.service.toLocaleLowerCase() === service).map(x  => x.endpoint);
-
+export async function getMandatoryFields(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+	endpointConfig: endpointConfiguration,
+): Promise<string[]> {
+	return endpointConfig.fields.filter((x) => x.mandatory === true).map((a) => a.name);
 }
 
-export async function getEndpointFieldConfig(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	service:string,
-	endpoint:string){
-
-	return config.filter(x => x.service.toLocaleLowerCase() === service && x.endpoint ===endpoint)[0].fields;
-
+export async function getServiceOptions(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+) {
+	return config.map((x) => x.service.toLocaleLowerCase());
+}
+export async function getFieldType(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+	endpointConfig: endpointConfiguration,
+	fieldName: string,
+): Promise<string> {
+	return endpointConfig.fields.filter((a) => a.name === fieldName)[0].type ?? 'string';
 }
 
-export async function getEndpointConfig(this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
-	service:string,
-	endpoint:string){
-
-	return config.filter(x => x.service.toLocaleLowerCase() === service && x.endpoint ===endpoint)[0];
-
+export async function getResourceOptions(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+	service: string,
+) {
+	return config.filter((x) => x.service.toLocaleLowerCase() === service).map((x) => x.endpoint);
 }
 
+export async function getEndpointFieldConfig(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+	service: string,
+	endpoint: string,
+) {
+	return config.filter(
+		(x) => x.service.toLocaleLowerCase() === service && x.endpoint === endpoint,
+	)[0].fields;
+}
+
+export async function getEndpointConfig(
+	this: IExecuteFunctions | IExecuteSingleFunctions | ILoadOptionsFunctions | IHookFunctions,
+	service: string,
+	endpoint: string,
+) {
+	return config.filter(
+		(x) => x.service.toLocaleLowerCase() === service && x.endpoint === endpoint,
+	)[0];
+}
 
 export const toDivisionOptions = (items: LoadedDivision[]) =>
-	items.map(({ Code, CustomerName, Description }) => ({ name: `${CustomerName} : ${Description}`, value: Code }));
+	items.map(({ Code, CustomerName, Description }) => ({
+		name: `${CustomerName} : ${Description}`,
+		value: Code,
+	}));
 
 export const toOptions = (items: LoadedOptions[]) =>
 	items.map(({ value, name }) => ({ name, value }));
@@ -214,10 +231,10 @@ export const toFieldSelectOptions = (items: LoadedFields[]) =>
 	items.map(({ name }) => ({ name, value: name }));
 
 export const toFieldFilterOptions = (items: endpointFieldConfiguration[]) =>
-items.map(({ name }) => ({ name, value: name }));
+	items.map(({ name }) => ({ name, value: name }));
 
-export const toOptionsFromStringArray = (items:string[]) =>
-	items.map((x) => ({name:x.charAt(0).toUpperCase() + x.slice(1), value:x}));
+export const toOptionsFromStringArray = (items: string[]) =>
+	items.map((x) => ({ name: x.charAt(0).toUpperCase() + x.slice(1), value: x }));
 
 /**
  * Makes an XML request to the Exact Online XML API
@@ -240,11 +257,7 @@ export async function exactOnlineXmlRequest(
 	// @ts-ignore
 	options.resolveWithFullResponse = true;
 
-	const authenticationMethod = this.getNodeParameter(
-		'authentication',
-		0,
-		'accessToken',
-	) as string;
+	const authenticationMethod = this.getNodeParameter('authentication', 0, 'accessToken') as string;
 	let credentialType = '';
 	if (authenticationMethod === 'accessToken') {
 		const credentials = await this.getCredentials('exactOnlineApi');
@@ -291,7 +304,8 @@ export async function exactOnlineXmlRequest(
  */
 export function createReconciliationXml(matchSets: MatchSet[]): string {
 	let xml = '<?xml version="1.0" encoding="utf-8"?>\n';
-	xml += '<MatchSets xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n';
+	xml +=
+		'<MatchSets xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n';
 
 	// Add match sets
 	for (const matchSet of matchSets) {
@@ -337,7 +351,10 @@ export function createReconciliationXml(matchSets: MatchSet[]): string {
 			}
 
 			if (matchSet.WriteOff.FinPeriod) {
-				xml += `      <FinPeriod>${parseInt(matchSet.WriteOff.FinPeriod as string, 10)}</FinPeriod>\n`;
+				xml += `      <FinPeriod>${parseInt(
+					matchSet.WriteOff.FinPeriod as string,
+					10,
+				)}</FinPeriod>\n`;
 			}
 
 			if (matchSet.WriteOff.Date) {
