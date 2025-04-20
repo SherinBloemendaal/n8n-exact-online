@@ -583,6 +583,9 @@ export class ExactOnline implements INodeType {
 						if (matchSets.length === 0) throw new NodeOperationError(this.getNode(), 'No valid MatchSet data found to process.', { itemIndex: itemIndex });
 
 						const xmlBody = createReconciliationXml(matchSets);
+
+						console.log(`Generated XML for ${endpointConfig.endpoint}:\n${xmlBody}`);
+
 						try {
 							// Use endpoint name (topic) from config
 							const response = await exactOnlineXmlRequest.call(this, division, endpointConfig.endpoint, xmlBody);
