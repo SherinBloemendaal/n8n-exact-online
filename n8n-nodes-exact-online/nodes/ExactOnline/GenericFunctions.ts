@@ -311,6 +311,13 @@ export async function exactOnlineXmlRequest(
 		options.uri = `${baseUrl}/docs/XMLUpload.aspx?Topic=${topic}&_Division_=${division}`;
 	}
 
+	// Log parameters just before the XML API call
+	console.log(`[ExactNode XML Request] Preparing call...`);
+	console.log(`  Division: ${division}`);
+	console.log(`  Topic: ${topic}`);
+	console.log(`  URI: ${options.uri}`);
+	console.log(`  XML Body:\n${xmlBody}`);
+
 	try {
 		const oAuth2Options: IOAuth2Options = {
 			includeCredentialsOnRefreshOnBody: true,
@@ -338,73 +345,83 @@ export async function exactOnlineXmlRequest(
 }
 
 /**
- * Creates XML for reconciliation
+ * Creates XML for reconciliation based on the full eExact XSD schema.
  */
 export function createReconciliationXml(matchSets: MatchSet[]): string {
 	let xml = '<?xml version="1.0" encoding="utf-8"?>\n';
-	xml +=
-		'<MatchSets xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n';
+	// Root element is eExact
+	xml += '<eExact xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n';
 
-	// Add match sets
+	// MatchSets container element
+	xml += '  <MatchSets>\n';
+
+	// Add each MatchSet
 	for (const matchSet of matchSets) {
-		xml += '  <MatchSet>\n';
+		xml += '    <MatchSet>\n';
 
-		// GLAccount - using code attribute as per example
-		xml += `    <GLAccount code="${matchSet.GLAccount}"/>\n`;
+		// GLAccount - using code attribute as per examples
+		xml += `      <GLAccount code="${matchSet.GLAccount}"/>\n`;
 
-		// Account (optional) - using code attribute as per example
+		// Account (optional) - using code attribute as per examples
 		if (matchSet.Account) {
-			xml += `    <Account code="${matchSet.Account}"/>\n`;
+			xml += `      <Account code="${matchSet.Account}"/>\n`;
 		}
 
-		// Match Lines
-		xml += '    <MatchLines>\n';
+		// Match Lines container
+		xml += '      <MatchLines>\n';
 		for (const matchLine of matchSet.MatchLines) {
-			xml += '      <MatchLine ';
-			xml += `finyear="${parseInt(matchLine.finYear as string, 10)}" `;
-			xml += `finperiod="${parseInt(matchLine.finPeriod as string, 10)}" `;
+			// Ensure correct types for attributes
+			const finYearInt = parseInt(String(matchLine.finYear), 10);
+			const finPeriodInt = parseInt(String(matchLine.finPeriod), 10);
+			const entryInt = parseInt(String(matchLine.entry), 10);
+			const amountFloat = parseFloat(String(matchLine.amountDC));
+
+			xml += '        <MatchLine ';
+			xml += `finyear="${finYearInt}" `;
+			xml += `finperiod="${finPeriodInt}" `;
 			xml += `journal="${matchLine.journal}" `;
-			xml += `entry="${parseInt(matchLine.entry as string, 10)}" `;
-			xml += `amountdc="${parseFloat(matchLine.amountDC as string)}" `;
+			xml += `entry="${entryInt}" `;
+			xml += `amountdc="${amountFloat}" `;
 			xml += '/>\n';
 		}
-		xml += '    </MatchLines>\n';
+		xml += '      </MatchLines>\n';
 
-		// WriteOff (optional) - now after MatchLines as per schema
+		// WriteOff (optional) - after MatchLines as per schema
 		if (matchSet.WriteOff) {
-			xml += `    <WriteOff type="${matchSet.WriteOff.type}">\n`;
+			xml += `      <WriteOff type="${matchSet.WriteOff.type}">\n`;
 
-			// Only include GLAccount if provided
+			// GLAccount within WriteOff (optional)
 			if (matchSet.WriteOff.GLAccount) {
-				xml += `      <GLAccount code="${matchSet.WriteOff.GLAccount}"/>\n`;
+				xml += `        <GLAccount code="${matchSet.WriteOff.GLAccount}"/>\n`;
 			}
 
-			// Only include fields if they're provided
+			// Other optional WriteOff fields
 			if (matchSet.WriteOff.Description) {
-				xml += `      <Description>${matchSet.WriteOff.Description}</Description>\n`;
+				xml += `        <Description>${matchSet.WriteOff.Description}</Description>\n`;
 			}
-
 			if (matchSet.WriteOff.FinYear) {
-				xml += `      <FinYear>${parseInt(matchSet.WriteOff.FinYear as string, 10)}</FinYear>\n`;
+				xml += `        <FinYear>${parseInt(String(matchSet.WriteOff.FinYear), 10)}</FinYear>\n`;
 			}
-
 			if (matchSet.WriteOff.FinPeriod) {
-				xml += `      <FinPeriod>${parseInt(
-					matchSet.WriteOff.FinPeriod as string,
-					10,
-				)}</FinPeriod>\n`;
+				xml += `        <FinPeriod>${parseInt(String(matchSet.WriteOff.FinPeriod), 10)}</FinPeriod>\n`;
 			}
-
 			if (matchSet.WriteOff.Date) {
-				xml += `      <Date>${matchSet.WriteOff.Date}</Date>\n`;
+				xml += `        <Date>${matchSet.WriteOff.Date}</Date>\n`; // Assuming YYYY-MM-DD format
+			}
+			if (matchSet.WriteOff.VATCorrection !== undefined) { // Check specifically for boolean
+				xml += `        <VATCorrection>${matchSet.WriteOff.VATCorrection}</VATCorrection>\n`;
 			}
 
-			xml += '    </WriteOff>\n';
+			xml += '      </WriteOff>\n';
 		}
 
-		xml += '  </MatchSet>\n';
+		xml += '    </MatchSet>\n';
 	}
 
-	xml += '</MatchSets>';
+	// Close MatchSets container
+	xml += '  </MatchSets>\n';
+
+	// Close root eExact element
+	xml += '</eExact>';
 	return xml;
 }

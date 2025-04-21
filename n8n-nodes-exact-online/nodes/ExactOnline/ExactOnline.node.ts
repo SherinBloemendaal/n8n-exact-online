@@ -596,11 +596,31 @@ export class ExactOnline implements INodeType {
 							}
 						}
 
-						console.log(`Generated XML for ${endpointConfig.endpoint}:\n${xmlBody}`);
+						// Log parameters just before the XML API call
+						console.log(`ExactOnline XML Request Debug Info - Item Index: ${itemIndex}`);
+						console.log(`  Division: ${division}`);
+						console.log(`  Endpoint (Topic): ${endpointConfig.endpoint}`);
+						console.log(`  XML Body:\n${xmlBody}`);
+
 						try {
 							const response = await exactOnlineXmlRequest.call(this, division, endpointConfig.endpoint, xmlBody);
 							if (response.statusCode === 200) {
-								returnData.push({ success: true, message: `XML operation '${endpointConfig.endpoint}' completed successfully`, response: response.body });
+								const responseBody = response.body as string;
+								if (typeof responseBody === 'string' && responseBody.includes('<Message type="3">')) {
+									let extractedError = 'Exact Online reported an error (Could not extract description).';
+									try {
+										const errorMatch = responseBody.match(/<Description>(.*?)<\/Description>/);
+										if (errorMatch && errorMatch[1]) {
+											extractedError = errorMatch[1];
+										}
+									} catch (regexError) {}
+									throw new NodeOperationError(this.getNode(), `Exact Online Error (despite HTTP 200): ${extractedError}\nRaw Response: ${responseBody}`,
+									{
+										itemIndex,
+									});
+								} else {
+									returnData.push({ success: true, message: `XML operation '${endpointConfig.endpoint}' completed successfully`, response: responseBody });
+								}
 							} else {
 								let errorMessage = response.body;
 								try {
