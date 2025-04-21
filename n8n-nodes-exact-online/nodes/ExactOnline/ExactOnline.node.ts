@@ -584,16 +584,25 @@ export class ExactOnline implements INodeType {
 							if (mainFieldName === 'MatchSets') {
 								let matchSets: MatchSet[];
 								try {
-									// Assume the user provides the complex structure as a JSON string in the fieldValue
-									const parsedFieldValue = JSON.parse(mainFieldData.fieldValue as string);
+									// Assume the user provides the complex structure *directly* as an array in the fieldValue
+									const rawFieldValue = mainFieldData.fieldValue;
+
 									// Basic validation based on config type 'Array[Object]'
-									if (!Array.isArray(parsedFieldValue)) {
-										throw new Error(`'${mainFieldName}' field value must be a JSON array string.`);
+									if (!Array.isArray(rawFieldValue)) {
+										// Provide more context in the error message
+										const valueType = typeof rawFieldValue;
+										let receivedValuePreview = String(rawFieldValue);
+										if (receivedValuePreview.length > 100) {
+											receivedValuePreview = receivedValuePreview.substring(0, 100) + '...';
+										}
+										throw new Error(`'${mainFieldName}' field value must be a JSON array. Received type '${valueType}' with value: ${receivedValuePreview}`);
 									}
 									// TODO: Deeper validation against the structure defined in JSON config?
-									matchSets = parsedFieldValue as MatchSet[];
+									// Directly assign the array
+									matchSets = rawFieldValue as MatchSet[];
 								} catch (e) {
-									throw new NodeOperationError(this.getNode(), `Invalid JSON provided in '${mainFieldName}' field value: ${e.message}`, { itemIndex });
+									// Catch potential errors from the validation above or unexpected issues
+									throw new NodeOperationError(this.getNode(), `Invalid data provided for '${mainFieldName}' field: ${e.message}`, { itemIndex });
 								}
 
 								if (matchSets.length === 0) {
