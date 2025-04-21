@@ -383,9 +383,9 @@ export class ExactOnline implements INodeType {
 							{
 								displayName: 'Field Value',
 								name: 'fieldValue',
-								type: 'string',
+								type: 'json',
 								default: '',
-								description: 'Value for the field to add/edit',
+								description: 'Value for the field to add/edit. Can be a string, number, boolean, or JSON object/array for complex types like MatchSets.',
 							},
 						],
 					},
@@ -524,11 +524,9 @@ export class ExactOnline implements INodeType {
 			);
 		}
 
-		// Determine API type and URI based on the loaded config
-		const apiType = endpointConfig.apiType; // Will be 'rest' or 'xml'
+		const apiType = endpointConfig.apiType;
 		const uri = endpointConfig.uri.replace('{division}', division);
 
-		// REST specific fields (only needed for some REST ops)
 		const excludeSelection = this.getNodeParameter('excludeSelection', 0, false) as boolean;
 		const selectedFields = this.getNodeParameter('selectedFields', 0, []) as string[];
 		let onlyNotSelectedFields: string[] = [];
@@ -539,27 +537,20 @@ export class ExactOnline implements INodeType {
 
 		for (let itemIndex = 0; itemIndex < length; itemIndex++) {
 			try {
-				// --- Branch based on API Type --- //
 				if (apiType === 'xml') {
-					// --- XML Logic --- //
 					if (operation === 'post') {
 						let xmlBody = '';
 						const useManualBodyXml = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
 
 						if (useManualBodyXml) {
-							// Manual body handling (assumes the user provides the full, correct XML string)
 							xmlBody = this.getNodeParameter('manualBody', itemIndex, '') as string;
 							if (!xmlBody) {
 								 throw new NodeOperationError(this.getNode(), 'Manual XML Body cannot be empty when Manual JSON Body is enabled.', { itemIndex });
 							}
 						} else {
-							// Use generic 'data.field' based on endpoint config
 							const fieldDefinitions = endpointConfig.fields || [];
 							const dataFields = this.getNodeParameter('data.field', itemIndex, []) as IDataObject[];
 
-							// For FFMatch, the config defines 'MatchSets' as the primary field.
-							// Find the first (and likely only) field definition from the config.
-							// This assumes XML POST operations primarily deal with one complex structure field.
 							const mainFieldDef = fieldDefinitions.length > 0 ? fieldDefinitions[0] : null;
 
 							if (!mainFieldDef) {
@@ -569,86 +560,67 @@ export class ExactOnline implements INodeType {
 							const mainFieldName = mainFieldDef.name;
 							const mainFieldData = dataFields.find(df => df.fieldName === mainFieldName);
 
-							if (!mainFieldData || !mainFieldData.fieldValue) {
+							if (!mainFieldData || mainFieldData.fieldValue === undefined || mainFieldData.fieldValue === null || mainFieldData.fieldValue === '') {
 								if (mainFieldDef.mandatory) {
-									throw new NodeOperationError(this.getNode(), `The mandatory '${mainFieldName}' field is missing or empty in Field Data. It should contain the data as a JSON string.`, { itemIndex });
+									throw new NodeOperationError(this.getNode(), `The mandatory '${mainFieldName}' field is missing or empty in Field Data.`, { itemIndex });
 								} else {
-									// If the field isn't mandatory and not provided, what should happen?
-									// For FFMatch, MatchSets IS mandatory. Assume mandatory if not specified? Or error.
-									throw new NodeOperationError(this.getNode(), `The field '${mainFieldName}' is missing or empty in Field Data. It should contain the data as a JSON string.`, { itemIndex });
+									throw new NodeOperationError(this.getNode(), `The field '${mainFieldName}' is missing or empty in Field Data.`, { itemIndex });
 								}
 							}
 
-							// Specific handling for FFMatch based on the field name 'MatchSets'
-							// If other XML endpoints are added, this might need a switch or factory pattern
 							if (mainFieldName === 'MatchSets') {
 								let matchSets: MatchSet[];
 								try {
-									// Assume the user provides the complex structure *directly* as an array in the fieldValue
 									const rawFieldValue = mainFieldData.fieldValue;
 
-									// Basic validation based on config type 'Array[Object]'
 									if (!Array.isArray(rawFieldValue)) {
-										// Provide more context in the error message
 										const valueType = typeof rawFieldValue;
-										let receivedValuePreview = String(rawFieldValue);
+										let receivedValuePreview = JSON.stringify(rawFieldValue);
 										if (receivedValuePreview.length > 100) {
 											receivedValuePreview = receivedValuePreview.substring(0, 100) + '...';
 										}
 										throw new Error(`'${mainFieldName}' field value must be a JSON array. Received type '${valueType}' with value: ${receivedValuePreview}`);
 									}
-									// TODO: Deeper validation against the structure defined in JSON config?
-									// Directly assign the array
 									matchSets = rawFieldValue as MatchSet[];
 								} catch (e) {
-									// Catch potential errors from the validation above or unexpected issues
-									throw new NodeOperationError(this.getNode(), `Invalid data provided for '${mainFieldName}' field: ${e.message}`, { itemIndex });
+									throw new NodeOperationError(this.getNode(), `Invalid data provided for \'${mainFieldName}\' field: ${e.message}`, { itemIndex });
 								}
 
 								if (matchSets.length === 0) {
-									throw new NodeOperationError(this.getNode(), `No valid data found in the parsed '${mainFieldName}' field to process.`, { itemIndex });
+									throw new NodeOperationError(this.getNode(), `No valid data found in the provided \'${mainFieldName}\' array.`, { itemIndex });
 								}
 
-								// This function remains specific to FFMatch's structure, but the data feeding it is now generic.
 								xmlBody = createReconciliationXml(matchSets);
 							} else {
-								// Handle future XML endpoints/field names here if needed
-								throw new NodeOperationError(this.getNode(), `XML construction logic not implemented for field '${mainFieldName}'.`, { itemIndex });
+								throw new NodeOperationError(this.getNode(), `XML construction logic not implemented for field \'${mainFieldName}\'.`, { itemIndex });
 							}
 						}
 
-						// Generic XML Request Part
-						console.log(`Generated XML for ${endpointConfig.endpoint}:\n${xmlBody}`); // Consider removing in production
+						console.log(`Generated XML for ${endpointConfig.endpoint}:\n${xmlBody}`);
 						try {
-							// Use endpoint name (topic) from config
 							const response = await exactOnlineXmlRequest.call(this, division, endpointConfig.endpoint, xmlBody);
 							if (response.statusCode === 200) {
 								returnData.push({ success: true, message: `XML operation '${endpointConfig.endpoint}' completed successfully`, response: response.body });
 							} else {
-								// Attempt to parse Exact Online XML error message if possible
 								let errorMessage = response.body;
 								try {
-									// Basic check for Exact's error structure
 									if (typeof response.body === 'string' && response.body.includes('<error>')) {
 										const errorMatch = response.body.match(/<description>(.*?)<\/description>/);
 										if (errorMatch && errorMatch[1]) {
 											errorMessage = errorMatch[1];
 										}
 									}
-								} catch (parseError) { /* Ignore parsing error, use raw body */ }
+								} catch (parseError) {}
 								throw new NodeOperationError(this.getNode(), `XML operation '${endpointConfig.endpoint}' failed: ${response.statusCode} - ${errorMessage}`, { itemIndex });
 							}
 						} catch (error) {
-							// Handle NodeOperationErrors thrown above, or other request errors
 							if (error instanceof NodeOperationError) throw error;
 							throw new NodeOperationError(this.getNode(), `XML operation '${endpointConfig.endpoint}' failed: ${error.message}`, { itemIndex });
 						}
 					} else {
-						// Handle other potential XML operations if added later
 						throw new NodeOperationError(this.getNode(), `Operation '${operation}' not supported for XML endpoint '${endpointConfig.endpoint}'.`, { itemIndex });
 					}
 				} else {
-					// --- REST API Logic --- //
 					switch (operation) {
 						case 'get': {
 							const qs: IDataObject = {};
@@ -678,16 +650,13 @@ export class ExactOnline implements INodeType {
 								for (let filterIndex = 0; filterIndex < filter.length; filterIndex++) {
 									const fieldName = filter[filterIndex].field as string;
 									const operator = filter[filterIndex].operator as string;
-									const rawValue = filter[filterIndex].value; // Get the raw value first
+									const rawValue = filter[filterIndex].value;
 									const fieldType = await getFieldType.call(this, endpointConfig, fieldName);
 
 									let filterSegment = '';
 
-									// Special handling for 'eq' operator and array values for specific types
 									if (operator === 'eq' && Array.isArray(rawValue)) {
 										if (rawValue.length === 0) {
-											// Handle empty array case - maybe filter for nothing? Or throw error?
-											// Option: filter for a condition that's always false
 											filterSegment = '1 eq 0';
 											console.warn(
 												`Filter for ${fieldName}: Received empty array for 'eq' operator. Resulting filter will likely return no results.`,
@@ -704,32 +673,22 @@ export class ExactOnline implements INodeType {
 														.map((val) => `${fieldName} eq '${val}'`)
 														.join(' or ');
 													break;
-												// Add cases for Edm.Int32, etc. if needed
-												// case 'Edm.Int32': case 'Edm.Int64': ...
-												//     filterSegment = rawValue.map(val => `${fieldName} eq ${val}`).join(' or ');
-												//     break;
-												default: // Use only first value as fallback
-													// Default numeric/boolean assumption
-													// Fallback for unsupported types with array + eq - treat as single value? Or error?
+												default:
 													console.warn(
 														`Filter for ${fieldName}: Array value provided for 'eq' operator on unsupported type ${fieldType}. Treating as single value.`,
 													);
 													const firstValueStr = String(rawValue[0]);
-													// Proceed as if it wasn't an array using firstValueStr
-													// This part duplicates the logic below - needs refactoring or clearer error
 													if (fieldType === 'Edm.Guid') {
 														filterSegment = `${fieldName} eq guid'${firstValueStr}'`;
 													} else if (fieldType === 'Edm.String') {
 														filterSegment = `${fieldName} eq '${firstValueStr}'`;
 													}
-													// ... handle other types for the single value ...
 													else filterSegment = `${fieldName} eq ${firstValueStr}`;
 													break;
 											}
 										}
 									} else {
-										// Handle non-array values or operators other than 'eq'
-										const valueStr = String(rawValue); // Ensure it's a string for standard processing
+										const valueStr = String(rawValue);
 										switch (fieldType) {
 											case 'Edm.String':
 												const opStr =
@@ -739,7 +698,6 @@ export class ExactOnline implements INodeType {
 												filterSegment = opStr;
 												break;
 											case 'Edm.Guid':
-												// Only 'eq' and 'ne' typically make sense for GUIDs with single values
 												if (operator === 'eq' || operator === 'ne') {
 													filterSegment = `${fieldName} ${operator} guid'${valueStr}'`;
 												} else {
@@ -765,7 +723,7 @@ export class ExactOnline implements INodeType {
 											case 'Edm.Byte':
 												filterSegment = `${fieldName} ${operator} ${valueStr}`;
 												break;
-											default: // Best guess
+											default:
 												console.warn(
 													`Filter for ${fieldName}: Unsupported field type ${fieldType}. Attempting basic filter.`,
 												);
