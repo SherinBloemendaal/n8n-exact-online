@@ -1,8 +1,8 @@
 [
 	{
 		"service": "financial",
-		"endpoint": "FFMatch",
-		"uri": "/docs/XMLUpload.aspx?Topic=FFMatch&_Division_={division}",
+		"endpoint": "MatchSets",
+		"uri": "/docs/XMLUpload.aspx?Topic=MatchSets&_Division_={division}",
 		"doc": "",
 		"webhook": false,
 		"methods": ["POST"],
@@ -20,7 +20,7 @@
 						"GLAccount": "1100",
 						"Account": "000123",
 						"MatchLines": [
-							{ "finYear": 2024, "finPeriod": 1, "journal": "70", "entry": 101, "amountDC": 100.00 }, 
+							{ "finYear": 2024, "finPeriod": 1, "journal": "70", "entry": 101, "amountDC": 100.00 },
 							{ "finYear": 2024, "finPeriod": 1, "journal": "80", "entry": 55, "amountDC": -100.00 }
 						],
 						"WriteOff": {
