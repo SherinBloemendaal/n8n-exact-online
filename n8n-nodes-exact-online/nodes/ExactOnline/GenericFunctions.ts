@@ -67,29 +67,34 @@ export async function exactOnlineApiRequest(
 		method,
 		body,
 		qs,
-		uri: ``, //`${credentials.url}${uri}`,
+		uri: ``, // URI will be set based on credentials
 		json: true,
-		//@ts-ignore
-		resolveWithFullResponse: true,
 	};
+	// @ts-ignore
+	options.resolveWithFullResponse = true;
 
-	const authenticationMethod = this.getNodeParameter('authentication', 0, 'accessToken') as string;
-	let credentialType = '';
+	const authenticationMethod = this.getNodeParameter(
+		'authentication',
+		0,
+		'oAuth2', // Default to OAuth2 as it's more common
+	) as string;
+
+	let credentialType: string;
+	let baseUrl: string;
+
 	if (authenticationMethod === 'accessToken') {
 		const credentials = await this.getCredentials('exactOnlineApi');
 		credentialType = 'exactOnlineApi';
-
-		const baseUrl = credentials.url || 'https://start.exactonline.nl';
-		options.uri = `${baseUrl}${uri}`;
+		baseUrl = String(credentials.url) || 'https://start.exactonline.nl';
 	} else {
 		const credentials = await this.getCredentials('exactOnlineApiOAuth2Api');
 		credentialType = 'exactOnlineApiOAuth2Api';
-
-		const baseUrl = credentials.url || 'https://start.exactonline.nl';
-		options.uri = `${baseUrl}${uri}`;
+		baseUrl = String(credentials.url) || 'https://start.exactonline.nl';
 	}
 
-	if (nextPageUrl !== '') {
+	options.uri = `${baseUrl}${uri}`;
+
+	if(nextPageUrl!==''){
 		options.uri = nextPageUrl;
 	}
 	options = Object.assign({}, options, option);
@@ -184,12 +189,20 @@ export async function getAllData(
 		}
 		nextPageUrl = responseData.body.d.__next;
 
-		if (!ignoreRateLimit && responseData.headers['x-ratelimit-minutely-remaining'] === '0') {
-			const waitTime = +responseData.headers['x-ratelimit-minutely-reset'] - Date.now();
-			if (waitTime >= 0) {
-				await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 60000)));
+		// Check if headers exist before accessing rate limit info
+		if (!ignoreRateLimit && responseData.headers && responseData.headers['x-ratelimit-minutely-remaining'] === "0") {
+			// Ensure reset header exists and is a number before calculating waitTime
+			const resetTimestamp = responseData.headers['x-ratelimit-minutely-reset'];
+			if (resetTimestamp && typeof resetTimestamp === 'number') {
+				const waitTime = resetTimestamp - Date.now();
+				if (waitTime >= 0) {
+					await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 60000)));
+				}
+			} else if (resetTimestamp) {
+				console.warn(`[ExactNode Rate Limit] Invalid x-ratelimit-minutely-reset header type: ${typeof resetTimestamp}. Value: ${resetTimestamp}`);
 			}
 		}
+
 	} while ((limit === 0 || returnData.length < limit) && responseData.body.d.__next);
 	if (limit !== 0) {
 		return returnData.slice(0, limit);
@@ -290,33 +303,32 @@ export async function exactOnlineXmlRequest(
 		},
 		method: 'POST',
 		body: xmlBody,
-		uri: '',
+		uri: '', // URI will be set based on credentials
+		// @ts-ignore
+		resolveWithFullResponse: true,
 	};
-	// @ts-ignore
-	options.resolveWithFullResponse = true;
 
-	const authenticationMethod = this.getNodeParameter('authentication', 0, 'accessToken') as string;
-	let credentialType = '';
+	const authenticationMethod = this.getNodeParameter(
+		'authentication',
+		0,
+		'oAuth2',
+	) as string;
+
+	let credentialType: string;
+	let baseUrl: string;
+
 	if (authenticationMethod === 'accessToken') {
 		const credentials = await this.getCredentials('exactOnlineApi');
 		credentialType = 'exactOnlineApi';
-
-		const baseUrl = credentials.url || 'https://start.exactonline.nl';
-		options.uri = `${baseUrl}/docs/XMLUpload.aspx?Topic=${topic}&_Division_=${division}`;
+		baseUrl = String(credentials.url) || 'https://start.exactonline.nl';
 	} else {
 		const credentials = await this.getCredentials('exactOnlineApiOAuth2Api');
 		credentialType = 'exactOnlineApiOAuth2Api';
-
-		const baseUrl = credentials.url || 'https://start.exactonline.nl';
-		options.uri = `${baseUrl}/docs/XMLUpload.aspx?Topic=${topic}&_Division_=${division}`;
+		baseUrl = String(credentials.url) || 'https://start.exactonline.nl';
 	}
 
-	// Log parameters just before the XML API call
-	console.log(`[ExactNode XML Request] Preparing call...`);
-	console.log(`  Division: ${division}`);
-	console.log(`  Topic: ${topic}`);
-	console.log(`  URI: ${options.uri}`);
-	console.log(`  XML Body:\n${xmlBody}`);
+	const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+	options.uri = `${cleanBaseUrl}/docs/XMLUpload.aspx?Topic=${topic}&_Division_=${division}`;
 
 	try {
 		const oAuth2Options: IOAuth2Options = {
@@ -349,28 +361,19 @@ export async function exactOnlineXmlRequest(
  */
 export function createReconciliationXml(matchSets: MatchSet[]): string {
 	let xml = '<?xml version="1.0" encoding="utf-8"?>\n';
-	// Root element is eExact
 	xml += '<eExact xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n';
-
-	// MatchSets container element
 	xml += '  <MatchSets>\n';
 
-	// Add each MatchSet
 	for (const matchSet of matchSets) {
 		xml += '    <MatchSet>\n';
-
-		// GLAccount - using code attribute as per examples
 		xml += `      <GLAccount code="${matchSet.GLAccount}"/>\n`;
 
-		// Account (optional) - using code attribute as per examples
 		if (matchSet.Account) {
 			xml += `      <Account code="${matchSet.Account}"/>\n`;
 		}
 
-		// Match Lines container
 		xml += '      <MatchLines>\n';
 		for (const matchLine of matchSet.MatchLines) {
-			// Ensure correct types for attributes
 			const finYearInt = parseInt(String(matchLine.finYear), 10);
 			const finPeriodInt = parseInt(String(matchLine.finPeriod), 10);
 			const entryInt = parseInt(String(matchLine.entry), 10);
@@ -386,16 +389,13 @@ export function createReconciliationXml(matchSets: MatchSet[]): string {
 		}
 		xml += '      </MatchLines>\n';
 
-		// WriteOff (optional) - after MatchLines as per schema
 		if (matchSet.WriteOff) {
 			xml += `      <WriteOff type="${matchSet.WriteOff.type}">\n`;
 
-			// GLAccount within WriteOff (optional)
 			if (matchSet.WriteOff.GLAccount) {
 				xml += `        <GLAccount code="${matchSet.WriteOff.GLAccount}"/>\n`;
 			}
 
-			// Other optional WriteOff fields
 			if (matchSet.WriteOff.Description) {
 				xml += `        <Description>${matchSet.WriteOff.Description}</Description>\n`;
 			}
@@ -406,9 +406,9 @@ export function createReconciliationXml(matchSets: MatchSet[]): string {
 				xml += `        <FinPeriod>${parseInt(String(matchSet.WriteOff.FinPeriod), 10)}</FinPeriod>\n`;
 			}
 			if (matchSet.WriteOff.Date) {
-				xml += `        <Date>${matchSet.WriteOff.Date}</Date>\n`; // Assuming YYYY-MM-DD format
+				xml += `        <Date>${matchSet.WriteOff.Date}</Date>\n`;
 			}
-			if (matchSet.WriteOff.VATCorrection !== undefined) { // Check specifically for boolean
+			if (matchSet.WriteOff.VATCorrection !== undefined) {
 				xml += `        <VATCorrection>${matchSet.WriteOff.VATCorrection}</VATCorrection>\n`;
 			}
 
@@ -418,10 +418,7 @@ export function createReconciliationXml(matchSets: MatchSet[]): string {
 		xml += '    </MatchSet>\n';
 	}
 
-	// Close MatchSets container
 	xml += '  </MatchSets>\n';
-
-	// Close root eExact element
 	xml += '</eExact>';
 	return xml;
 }
