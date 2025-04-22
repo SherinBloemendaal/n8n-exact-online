@@ -424,13 +424,12 @@ export class ExactOnline implements INodeType {
 				const service = this.getNodeParameter('service', 0) as string;
 				const resource = this.getNodeParameter('resource', 0) as string;
 
-								const endpointConfig = (await getEndpointConfig.call(
+				const endpointConfig = (await getEndpointConfig.call(
 					this,
 					service,
 					resource,
 				)) as EndpointConfiguration;
 
-				// If endpointConfig is not found, return empty options
 				if (!endpointConfig) {
 					return [];
 				}
@@ -440,7 +439,6 @@ export class ExactOnline implements INodeType {
 					methods.push('getAll');
 				}
 
-				// Conditionally add 'getAllViaParentId' if parentResource is defined
 				if (endpointConfig.parentResource) {
 					methods.push('getAllViaParentId');
 				}
@@ -481,7 +479,6 @@ export class ExactOnline implements INodeType {
 					service,
 					resource,
 				)) as EndpointConfiguration;
-				//exclude auto generated values, these cannot be set by the user.
 				const exclude = [
 					'Created',
 					'Creator',
@@ -500,10 +497,6 @@ export class ExactOnline implements INodeType {
 		},
 	};
 
-	// The function below is responsible for actually doing whatever this node
-	// is supposed to do. In this case, we're just appending the `myString` property
-	// with whatever the user has entered.
-	// You can make async calls and use `await`.
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		let returnData: IDataObject[] = [];
@@ -514,7 +507,7 @@ export class ExactOnline implements INodeType {
 		const service = this.getNodeParameter('service', 0, '') as string;
 		const resource = this.getNodeParameter('resource', 0, '') as string;
 		const operation = this.getNodeParameter('operation', 0, '') as string;
-		const endpointConfig = await getEndpointConfig.call(this, service, resource); // Returns EndpointConfiguration | undefined
+		const endpointConfig = await getEndpointConfig.call(this, service, resource);
 
 		if (!endpointConfig) {
 			throw new NodeOperationError(
@@ -540,31 +533,60 @@ export class ExactOnline implements INodeType {
 				if (apiType === 'xml') {
 					if (operation === 'post') {
 						let xmlBody = '';
-						const useManualBodyXml = this.getNodeParameter('useManualBody', itemIndex, false) as boolean;
+						const useManualBodyXml = this.getNodeParameter(
+							'useManualBody',
+							itemIndex,
+							false,
+						) as boolean;
 
 						if (useManualBodyXml) {
 							xmlBody = this.getNodeParameter('manualBody', itemIndex, '') as string;
 							if (!xmlBody) {
-								 throw new NodeOperationError(this.getNode(), 'Manual XML Body cannot be empty when Manual JSON Body is enabled.', { itemIndex });
+								throw new NodeOperationError(
+									this.getNode(),
+									'Manual XML Body cannot be empty when Manual JSON Body is enabled.',
+									{ itemIndex },
+								);
 							}
 						} else {
 							const fieldDefinitions = endpointConfig.fields || [];
-							const dataFields = this.getNodeParameter('data.field', itemIndex, []) as IDataObject[];
+							const dataFields = this.getNodeParameter(
+								'data.field',
+								itemIndex,
+								[],
+							) as IDataObject[];
 
 							const mainFieldDef = fieldDefinitions.length > 0 ? fieldDefinitions[0] : null;
 
 							if (!mainFieldDef) {
-								throw new NodeOperationError(this.getNode(), `Configuration error: No field definition found for XML endpoint '${endpointConfig.endpoint}'.`, { itemIndex });
+								throw new NodeOperationError(
+									this.getNode(),
+									`Configuration error: No field definition found for XML endpoint '${endpointConfig.endpoint}'.`,
+									{ itemIndex },
+								);
 							}
 
 							const mainFieldName = mainFieldDef.name;
-							const mainFieldData = dataFields.find(df => df.fieldName === mainFieldName);
+							const mainFieldData = dataFields.find((df) => df.fieldName === mainFieldName);
 
-							if (!mainFieldData || mainFieldData.fieldValue === undefined || mainFieldData.fieldValue === null || mainFieldData.fieldValue === '') {
+							if (
+								!mainFieldData ||
+								mainFieldData.fieldValue === undefined ||
+								mainFieldData.fieldValue === null ||
+								mainFieldData.fieldValue === ''
+							) {
 								if (mainFieldDef.mandatory) {
-									throw new NodeOperationError(this.getNode(), `The mandatory '${mainFieldName}' field is missing or empty in Field Data.`, { itemIndex });
+									throw new NodeOperationError(
+										this.getNode(),
+										`The mandatory '${mainFieldName}' field is missing or empty in Field Data.`,
+										{ itemIndex },
+									);
 								} else {
-									throw new NodeOperationError(this.getNode(), `The field '${mainFieldName}' is missing or empty in Field Data.`, { itemIndex });
+									throw new NodeOperationError(
+										this.getNode(),
+										`The field '${mainFieldName}' is missing or empty in Field Data.`,
+										{ itemIndex },
+									);
 								}
 							}
 
@@ -579,47 +601,98 @@ export class ExactOnline implements INodeType {
 										if (receivedValuePreview.length > 100) {
 											receivedValuePreview = receivedValuePreview.substring(0, 100) + '...';
 										}
-										throw new Error(`'${mainFieldName}' field value must be a JSON array. Received type '${valueType}' with value: ${receivedValuePreview}`);
+										throw new NodeOperationError(
+											this.getNode(),
+											`'${mainFieldName}' field value must be a JSON array. Received type '${valueType}' with value: ${receivedValuePreview}`,
+											{ itemIndex },
+										);
 									}
 									matchSets = rawFieldValue as MatchSet[];
 								} catch (e) {
-									throw new NodeOperationError(this.getNode(), `Invalid data provided for \'${mainFieldName}\' field: ${e.message}`, { itemIndex });
+									throw new NodeOperationError(
+										this.getNode(),
+										`Invalid data provided for \'${mainFieldName}\' field: ${e.message}`,
+										{ itemIndex },
+									);
 								}
 
 								if (matchSets.length === 0) {
-									throw new NodeOperationError(this.getNode(), `No valid data found in the provided \'${mainFieldName}\' array.`, { itemIndex });
+									throw new NodeOperationError(
+										this.getNode(),
+										`No valid data found in the provided \'${mainFieldName}\' array.`,
+										{ itemIndex },
+									);
 								}
 
 								xmlBody = createReconciliationXml(matchSets);
 							} else {
-								throw new NodeOperationError(this.getNode(), `XML construction logic not implemented for field \'${mainFieldName}\'.`, { itemIndex });
+								throw new NodeOperationError(
+									this.getNode(),
+									`XML construction logic not implemented for field \'${mainFieldName}\'.`,
+									{ itemIndex },
+								);
 							}
 						}
 
-						// Log parameters just before the XML API call
-						console.log(`ExactOnline XML Request Debug Info - Item Index: ${itemIndex}`);
-						console.log(`  Division: ${division}`);
-						console.log(`  Endpoint (Topic): ${endpointConfig.endpoint}`);
-						console.log(`  XML Body:\n${xmlBody}`);
-
 						try {
-							const response = await exactOnlineXmlRequest.call(this, division, endpointConfig.endpoint, xmlBody);
+							const response = await exactOnlineXmlRequest.call(
+								this,
+								division,
+								endpointConfig.endpoint,
+								xmlBody,
+							);
 							if (response.statusCode === 200) {
 								const responseBody = response.body as string;
-								if (typeof responseBody === 'string' && responseBody.includes('<Message type="3">')) {
-									let extractedError = 'Exact Online reported an error (Could not extract description).';
+								let extractedError = '';
+								let isError = false;
+
+								if (typeof responseBody === 'string' && responseBody.includes('<Message')) {
 									try {
-										const errorMatch = responseBody.match(/<Description>(.*?)<\/Description>/);
+										const errorMatch = responseBody.match(/<Description>([^<]+)<\/Description>/);
 										if (errorMatch && errorMatch[1]) {
-											extractedError = errorMatch[1];
+											const description = errorMatch[1];
+
+											if (
+												description.includes('Error:') ||
+												description.includes('failed') ||
+												description.includes('Niet gevonden')
+											) {
+												extractedError = description;
+												isError = true;
+											} else if (responseBody.includes('type="3"')) {
+												extractedError =
+													description ||
+													'Exact Online reported an error (Could not extract description from type 3 message).';
+												isError = true;
+											}
+										} else if (responseBody.includes('type="3"')) {
+											extractedError =
+												'Exact Online reported an error (Message type 3 without description).';
+											isError = true;
 										}
-									} catch (regexError) {}
-									throw new NodeOperationError(this.getNode(), `Exact Online Error (despite HTTP 200): ${extractedError}\nRaw Response: ${responseBody}`,
-									{
-										itemIndex,
-									});
+									} catch (regexError) {
+										if (responseBody.includes('type="3"')) {
+											extractedError =
+												'Exact Online reported an error (Failed to parse description from type 3 message).';
+											isError = true;
+										}
+									}
+								}
+
+								if (isError) {
+									throw new NodeOperationError(
+										this.getNode(),
+										`Exact Online Error (despite HTTP 200): ${extractedError}\nRaw Response: ${responseBody}`,
+										{
+											itemIndex,
+										},
+									);
 								} else {
-									returnData.push({ success: true, message: `XML operation '${endpointConfig.endpoint}' completed successfully`, response: responseBody });
+									returnData.push({
+										success: true,
+										message: `XML operation '${endpointConfig.endpoint}' completed successfully`,
+										response: responseBody,
+									});
 								}
 							} else {
 								let errorMessage = response.body;
@@ -629,16 +702,36 @@ export class ExactOnline implements INodeType {
 										if (errorMatch && errorMatch[1]) {
 											errorMessage = errorMatch[1];
 										}
+									} else if (
+										typeof response.body === 'string' &&
+										response.body.includes('<Message')
+									) {
+										const errorMatch = response.body.match(/<Description>([^<]+)<\/Description>/);
+										if (errorMatch && errorMatch[1]) {
+											errorMessage = errorMatch[1];
+										}
 									}
 								} catch (parseError) {}
-								throw new NodeOperationError(this.getNode(), `XML operation '${endpointConfig.endpoint}' failed: ${response.statusCode} - ${errorMessage}`, { itemIndex });
+								throw new NodeOperationError(
+									this.getNode(),
+									`XML operation '${endpointConfig.endpoint}' failed: ${response.statusCode} - ${errorMessage}`,
+									{ itemIndex },
+								);
 							}
 						} catch (error) {
 							if (error instanceof NodeOperationError) throw error;
-							throw new NodeOperationError(this.getNode(), `XML operation '${endpointConfig.endpoint}' failed: ${error.message}`, { itemIndex });
+							throw new NodeOperationError(
+								this.getNode(),
+								`XML operation '${endpointConfig.endpoint}' failed: ${error.message}`,
+								{ itemIndex },
+							);
 						}
 					} else {
-						throw new NodeOperationError(this.getNode(), `Operation '${operation}' not supported for XML endpoint '${endpointConfig.endpoint}'.`, { itemIndex });
+						throw new NodeOperationError(
+							this.getNode(),
+							`Operation '${operation}' not supported for XML endpoint '${endpointConfig.endpoint}'.`,
+							{ itemIndex },
+						);
 					}
 				} else {
 					switch (operation) {
@@ -678,9 +771,6 @@ export class ExactOnline implements INodeType {
 									if (operator === 'eq' && Array.isArray(rawValue)) {
 										if (rawValue.length === 0) {
 											filterSegment = '1 eq 0';
-											console.warn(
-												`Filter for ${fieldName}: Received empty array for 'eq' operator. Resulting filter will likely return no results.`,
-											);
 										} else {
 											switch (fieldType) {
 												case 'Edm.Guid':
@@ -694,16 +784,12 @@ export class ExactOnline implements INodeType {
 														.join(' or ');
 													break;
 												default:
-													console.warn(
-														`Filter for ${fieldName}: Array value provided for 'eq' operator on unsupported type ${fieldType}. Treating as single value.`,
-													);
 													const firstValueStr = String(rawValue[0]);
 													if (fieldType === 'Edm.Guid') {
 														filterSegment = `${fieldName} eq guid'${firstValueStr}'`;
 													} else if (fieldType === 'Edm.String') {
 														filterSegment = `${fieldName} eq '${firstValueStr}'`;
-													}
-													else filterSegment = `${fieldName} eq ${firstValueStr}`;
+													} else filterSegment = `${fieldName} eq ${firstValueStr}`;
 													break;
 											}
 										}
@@ -721,9 +807,6 @@ export class ExactOnline implements INodeType {
 												if (operator === 'eq' || operator === 'ne') {
 													filterSegment = `${fieldName} ${operator} guid'${valueStr}'`;
 												} else {
-													console.warn(
-														`Unsupported operator '${operator}' for Guid field '${fieldName}'. Using 'eq'.`,
-													);
 													filterSegment = `${fieldName} eq guid'${valueStr}'`;
 												}
 												break;
@@ -744,9 +827,6 @@ export class ExactOnline implements INodeType {
 												filterSegment = `${fieldName} ${operator} ${valueStr}`;
 												break;
 											default:
-												console.warn(
-													`Filter for ${fieldName}: Unsupported field type ${fieldType}. Attempting basic filter.`,
-												);
 												filterSegment = `${fieldName} ${operator} '${valueStr}'`;
 												break;
 										}
@@ -987,15 +1067,10 @@ export class ExactOnline implements INodeType {
 					}
 				}
 			} catch (error) {
-				// This node should never fail but we want to showcase how
-				// to handle errors.
 				if (this.continueOnFail()) {
 					returnData.push({ error });
 				} else {
-					// Adding `itemIndex` allows other workflows to handle this error
 					if (error.context) {
-						// If the error thrown already contains the context property,
-						// only append the itemIndex
 						error.context.itemIndex = itemIndex;
 						throw error;
 					}
