@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-exact-online-v1",
-  "version": "0.2.30",
+  "version": "0.2.31",
   "private": false,
   "description": "Exact Online Community node for n8n",
   "keywords": [
@@ -50,5 +50,8 @@
     "prettier": "^2.7.1",
     "tslint": "^6.1.2",
     "typescript": "~4.6.0"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.2.1"
   }
 }

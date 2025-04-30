@@ -39,6 +39,15 @@ import {
 	ReconciledTransaction,
 	WriteOff,
 } from './types';
+import { XMLParser } from 'fast-xml-parser';
+
+const xmlParserOptions = {
+	ignoreAttributes: false,
+	attributeNamePrefix: '@_',
+	allowBooleanAttributes: true,
+	parseTagValue: true,
+	trimValues: true,
+};
 
 export class ExactOnline implements INodeType {
 	description: INodeTypeDescription = {
@@ -533,40 +542,21 @@ export class ExactOnline implements INodeType {
 				if (apiType === 'xml') {
 					if (operation === 'post') {
 						let xmlBody = '';
-						const useManualBodyXml = this.getNodeParameter(
-							'useManualBody',
+
+						const fieldDefinitions = endpointConfig.fields || [];
+						const dataFields = this.getNodeParameter(
+							'data.field',
 							itemIndex,
-							false,
-						) as boolean;
+							[],
+						) as IDataObject[];
 
-						if (useManualBodyXml) {
-							xmlBody = this.getNodeParameter('manualBody', itemIndex, '') as string;
-							if (!xmlBody) {
-								throw new NodeOperationError(
-									this.getNode(),
-									'Manual XML Body cannot be empty when Manual JSON Body is enabled.',
-									{ itemIndex },
-								);
-							}
-						} else {
-							const fieldDefinitions = endpointConfig.fields || [];
-							const dataFields = this.getNodeParameter(
-								'data.field',
-								itemIndex,
-								[],
-							) as IDataObject[];
+						const mainFieldDef = fieldDefinitions.length > 0 ? fieldDefinitions[0] : null;
 
-							const mainFieldDef = fieldDefinitions.length > 0 ? fieldDefinitions[0] : null;
+						let mainFieldName: string | null = null;
+						let matchSets: MatchSet[] = [];
 
-							if (!mainFieldDef) {
-								throw new NodeOperationError(
-									this.getNode(),
-									`Configuration error: No field definition found for XML endpoint '${endpointConfig.endpoint}'.`,
-									{ itemIndex },
-								);
-							}
-
-							const mainFieldName = mainFieldDef.name;
+						if (mainFieldDef) {
+							mainFieldName = mainFieldDef.name;
 							const mainFieldData = dataFields.find((df) => df.fieldName === mainFieldName);
 
 							if (
@@ -591,7 +581,6 @@ export class ExactOnline implements INodeType {
 							}
 
 							if (mainFieldName === 'MatchSets') {
-								let matchSets: MatchSet[];
 								try {
 									const rawFieldValue = mainFieldData.fieldValue;
 
@@ -611,7 +600,7 @@ export class ExactOnline implements INodeType {
 								} catch (e) {
 									throw new NodeOperationError(
 										this.getNode(),
-										`Invalid data provided for \'${mainFieldName}\' field: ${e.message}`,
+										`Invalid data provided for '${mainFieldName}' field: ${e.message}`,
 										{ itemIndex },
 									);
 								}
@@ -619,7 +608,7 @@ export class ExactOnline implements INodeType {
 								if (matchSets.length === 0) {
 									throw new NodeOperationError(
 										this.getNode(),
-										`No valid data found in the provided \'${mainFieldName}\' array.`,
+										`No valid data found in the provided '${mainFieldName}' array.`,
 										{ itemIndex },
 									);
 								}
@@ -628,10 +617,16 @@ export class ExactOnline implements INodeType {
 							} else {
 								throw new NodeOperationError(
 									this.getNode(),
-									`XML construction logic not implemented for field \'${mainFieldName}\'.`,
+									`XML construction logic not implemented for field '${mainFieldName}'.`,
 									{ itemIndex },
 								);
 							}
+						} else {
+							throw new NodeOperationError(
+								this.getNode(),
+								`No field definitions found for endpoint '${endpointConfig.endpoint}'. Cannot determine primary field for XML construction.`,
+								{ itemIndex },
+							);
 						}
 
 						try {
@@ -641,77 +636,99 @@ export class ExactOnline implements INodeType {
 								endpointConfig.endpoint,
 								xmlBody,
 							);
+							const responseBody = response.body as string;
+							const parser = new XMLParser(xmlParserOptions);
+							let parsedResponse: IDataObject | null = null;
+							try {
+								const parsedResult = parser.parse(responseBody);
+								if(typeof parsedResult === 'object' && parsedResult !== null) {
+									parsedResponse = parsedResult as IDataObject;
+								} else {
+									throw new Error('Parsed XML is not a valid object');
+								}
+							} catch (parseError: unknown) {
+								const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+								throw new NodeOperationError(
+									this.getNode(),
+									`Failed to parse XML response: ${errorMessage}\nRaw Response: ${responseBody}`,
+									{ itemIndex },
+								);
+							}
+
+							if (!parsedResponse) {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Failed to parse XML or parsed result was null.\nRaw Response: ${responseBody}`,
+									{ itemIndex },
+								);
+							}
+
 							if (response.statusCode === 200) {
-								const responseBody = response.body as string;
-								let extractedError = '';
-								let isError = false;
-
-								if (typeof responseBody === 'string' && responseBody.includes('<Message')) {
-									try {
-										const errorMatch = responseBody.match(/<Description>([^<]+)<\/Description>/);
-										if (errorMatch && errorMatch[1]) {
-											const description = errorMatch[1];
-
-											if (
-												description.includes('Error:') ||
-												description.includes('failed') ||
-												description.includes('Niet gevonden')
-											) {
-												extractedError = description;
-												isError = true;
-											} else if (responseBody.includes('type="3"')) {
-												extractedError =
-													description ||
-													'Exact Online reported an error (Could not extract description from type 3 message).';
-												isError = true;
-											}
-										} else if (responseBody.includes('type="3"')) {
-											extractedError =
-												'Exact Online reported an error (Message type 3 without description).';
-											isError = true;
-										}
-									} catch (regexError) {
-										if (responseBody.includes('type="3"')) {
-											extractedError =
-												'Exact Online reported an error (Failed to parse description from type 3 message).';
-											isError = true;
-										}
-									}
+								const eExact = parsedResponse?.[ 'eExact' ] as IDataObject | undefined;
+								const messagesObj = eExact?.[ 'Messages' ] as IDataObject | undefined;
+								const messages = messagesObj?.[ 'Message' ];
+								let processedMessages: IDataObject[] = [];
+								if (messages) {
+									const messageArray = Array.isArray(messages) ? messages : [messages];
+									processedMessages = messageArray.map(msg => msg as IDataObject);
 								}
 
-								if (isError) {
+								const errorMessages = processedMessages.filter(
+									(msg) => String(msg?.[ '@_type' ]) === '3' || String(msg?.[ '@_type' ]) === '4',
+								);
+								const successMessages = processedMessages.filter(
+									(msg) => String(msg?.[ '@_type' ]) !== '3' && String(msg?.[ '@_type' ]) !== '4',
+								);
+
+								if (errorMessages.length > 0) {
+									const errorDescriptions = errorMessages
+										.map((msg) => msg?.Description || 'Unknown error')
+										.join('; ');
 									throw new NodeOperationError(
 										this.getNode(),
-										`Exact Online Error (despite HTTP 200): ${extractedError}\nRaw Response: ${responseBody}`,
-										{
-											itemIndex,
-										},
+										`Exact Online reported errors: ${errorDescriptions}\nRaw Response: ${responseBody}`,
+										{ itemIndex },
 									);
-								} else {
-									returnData.push({
-										success: true,
-										message: `XML operation '${endpointConfig.endpoint}' completed successfully`,
-										response: responseBody,
-									});
 								}
-							} else {
-								let errorMessage = response.body;
-								try {
-									if (typeof response.body === 'string' && response.body.includes('<error>')) {
-										const errorMatch = response.body.match(/<description>(.*?)<\/description>/);
-										if (errorMatch && errorMatch[1]) {
-											errorMessage = errorMatch[1];
-										}
-									} else if (
-										typeof response.body === 'string' &&
-										response.body.includes('<Message')
-									) {
-										const errorMatch = response.body.match(/<Description>([^<]+)<\/Description>/);
-										if (errorMatch && errorMatch[1]) {
-											errorMessage = errorMatch[1];
-										}
+
+								if (endpointConfig.endpoint === 'MatchSets' && mainFieldName === 'MatchSets') {
+									if (processedMessages.length !== matchSets.length) {
+										throw new NodeOperationError(
+											this.getNode(),
+											`Mismatch in expected vs received messages. Expected ${matchSets.length}, received ${processedMessages.length}. Response might indicate partial success or unexpected errors.\nRaw Response: ${responseBody}`,
+											{ itemIndex },
+										);
 									}
-								} catch (parseError) {}
+								}
+
+								returnData.push({
+									success: true,
+									message: `XML operation '${endpointConfig.endpoint}' completed. Messages: ${successMessages.map((msg) => msg.Description).join('; ')}`,
+									response: parsedResponse,
+								});
+
+							} else {
+								let errorMessage = 'Unknown error';
+								const eExact = parsedResponse?.[ 'eExact' ] as IDataObject | undefined;
+								const messagesObj = eExact?.[ 'Messages' ] as IDataObject | undefined;
+								const messages = messagesObj?.[ 'Message' ];
+								let processedMessages: IDataObject[] = [];
+								if (messages) {
+									const messageArray = Array.isArray(messages) ? messages : [messages];
+									processedMessages = messageArray.map(msg => msg as IDataObject);
+									const errorDesc = processedMessages
+										.map((msg) => msg.Description)
+										.filter(Boolean)
+										.join('; ');
+									if (errorDesc) {
+										errorMessage = errorDesc;
+									} else if (typeof responseBody === 'string') {
+										errorMessage = responseBody;
+									}
+								} else if (typeof responseBody === 'string') {
+									errorMessage = responseBody;
+								}
+
 								throw new NodeOperationError(
 									this.getNode(),
 									`XML operation '${endpointConfig.endpoint}' failed: ${response.statusCode} - ${errorMessage}`,
