@@ -674,10 +674,10 @@ export class ExactOnline implements INodeType {
 								}
 
 								const errorMessages = processedMessages.filter(
-									(msg) => String(msg?.[ '@_type' ]) === '3' || String(msg?.[ '@_type' ]) === '4',
+									(msg) => String(msg?.[ '@_type' ]) === '0' || String(msg?.[ '@_type' ]) === '3' || String(msg?.[ '@_type' ]) === '4',
 								);
 								const successMessages = processedMessages.filter(
-									(msg) => String(msg?.[ '@_type' ]) !== '3' && String(msg?.[ '@_type' ]) !== '4',
+									(msg) => String(msg?.[ '@_type' ]) !== '0' && String(msg?.[ '@_type' ]) !== '3' && String(msg?.[ '@_type' ]) !== '4',
 								);
 
 								if (errorMessages.length > 0) {
